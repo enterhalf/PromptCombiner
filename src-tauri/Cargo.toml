@@ -1,0 +1,21 @@
+[package]
+name = "prompt-combiner"
+version = "1.0.0"
+description = "Cross-platform Prompt Combiner"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = ["dialog-open", "dialog-save", "fs-read-file", "fs-write-file", "fs-read-dir", "fs-create-dir", "fs-remove-file", "fs-rename-file", "fs-copy-file", "fs-exists", "path-all", "shell-open"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
