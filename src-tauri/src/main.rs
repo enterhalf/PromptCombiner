@@ -9,6 +9,8 @@ pub struct TextBox {
     pub title: String,
     pub content: String,
     pub mode: String,
+    #[serde(default)]
+    pub current_variant_index: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -24,6 +26,8 @@ pub struct PromptFile {
     pub heights: std::collections::HashMap<String, u32>,
     pub text_boxes: std::collections::HashMap<String, TextBox>,
     pub separators: Vec<Separator>,
+    #[serde(default)]
+    pub variants: std::collections::HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -93,6 +97,7 @@ fn create_prompt_file(workspace_path: String, name: String) -> Result<String, St
         heights: std::collections::HashMap::new(),
         text_boxes: std::collections::HashMap::new(),
         separators: vec![],
+        variants: std::collections::HashMap::new(),
     };
 
     let content = serde_json::to_string_pretty(&prompt_file)

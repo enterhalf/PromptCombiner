@@ -1,6 +1,5 @@
 <script lang="ts">
   import { appStore } from "../store";
-  import { savePromptFile } from "../tauri-api";
   import type { PromptFile, TextBox } from "../types";
 
   export let currentFile: PromptFile;
@@ -50,28 +49,6 @@
       } catch (error) {
         console.error("Failed to copy:", error);
         alert("Failed to copy to clipboard");
-      }
-    }
-  }
-
-  async function handleSave() {
-    if (!currentFile || !$appStore.workspacePath) return;
-
-    try {
-      const filePath = `${$appStore.workspacePath}/${currentFile.name}`;
-      await savePromptFile(filePath, currentFile);
-      alert("File saved successfully!");
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error("Failed to save:", error);
-
-      if (errorMessage.includes("Tauri") || errorMessage.includes("invoke")) {
-        alert(
-          'This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".'
-        );
-      } else {
-        alert(`Failed to save file: ${errorMessage}`);
       }
     }
   }
@@ -129,7 +106,13 @@
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const varName = tb.title.trim().toLowerCase().replace(" ", "_");
-        shadowVars.set(varName, tb.content);
+        const currentVariantIndex = tb.currentVariantIndex || 0;
+        let content = tb.content;
+        if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
+          content =
+            currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+        }
+        shadowVars.set(varName, content);
       }
     });
 
@@ -143,7 +126,12 @@
         result += lastSeparator;
       }
 
+      const currentVariantIndex = tb.currentVariantIndex || 0;
       let content = tb.content;
+      if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
+        content =
+          currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+      }
 
       shadowVars.forEach((value, key) => {
         const placeholder = `{{${key}}}`;
@@ -160,12 +148,6 @@
 <div class="flex-1 flex flex-col h-full bg-gray-900 p-4">
   <div class="flex gap-2 mb-4">
     <button
-      on:click={handleSave}
-      class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-    >
-      Save
-    </button>
-    <button
       on:click={handleGenerate}
       class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
     >
@@ -179,50 +161,44 @@
     </button>
   </div>
 
-  <div class="flex-1 flex gap-4 overflow-hidden">
-    <div class="flex-1 overflow-y-auto pr-2">
-      <h3 class="text-white font-bold mb-2">Outline</h3>
-      <div class="space-y-1">
-        {#each outlineItems as item, index}
-          <div
-            draggable="true"
-            on:dragstart={() => handleDragStart(index)}
-            on:dragover={(e) => handleDragOver(e, index)}
-            on:drop={(e) => handleDrop(e, index)}
-            class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move"
-            on:click={() => handleOutlineClick(item.id)}
-          >
-            <span class="mr-2 text-gray-400">☰</span>
-            <span class="mr-2">📝</span>
-            <span class="text-gray-300 text-sm truncate flex-1">
-              {item.title}
-            </span>
-          </div>
-        {/each}
-      </div>
-    </div>
-
-    <div class="flex-1 overflow-y-auto">
-      <h3 class="text-white font-bold mb-2">Preview</h3>
-      <div class="bg-gray-800 rounded-lg p-4 min-h-64">
-        <pre
-          class="text-gray-300 text-sm whitespace-pre-wrap break-words">{generatePreview()}</pre>
-      </div>
+  <div class="flex-1 overflow-y-auto pr-2">
+    <h3 class="text-white font-bold mb-2">Outline</h3>
+    <div class="space-y-1">
+      {#each outlineItems as item, index}
+        <div
+          draggable="true"
+          on:dragstart={() => handleDragStart(index)}
+          on:dragover={(e) => handleDragOver(e, index)}
+          on:drop={(e) => handleDrop(e, index)}
+          class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move"
+          on:click={() => handleOutlineClick(item.id)}
+        >
+          <span class="mr-2 text-gray-400">☰</span>
+          <span class="mr-2">📝</span>
+          <span class="text-gray-300 text-sm truncate flex-1">
+            {item.title}
+          </span>
+        </div>
+      {/each}
     </div>
   </div>
 </div>
 
 {#if $appStore.showGeneratedModal}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    on:click={() => appStore.setShowGeneratedModal(false)}
+  >
     <div
-      class="bg-gray-800 rounded-lg p-6 w-[800px] max-h-[80vh] flex flex-col"
+      class="bg-gray-800 rounded-lg p-6 w-[800px] h-[90vh] flex flex-col"
+      on:click|stopPropagation
     >
       <h2 class="text-white text-lg font-bold mb-4">Generated Text</h2>
       <div class="flex-1 overflow-y-auto mb-4">
         <textarea
           readonly
           value={$appStore.generatedText}
-          class="w-full h-64 bg-gray-900 text-white p-3 rounded resize-none"
+          class="w-full h-full bg-gray-900 text-white p-3 rounded resize-none"
         ></textarea>
       </div>
       <div class="flex justify-end gap-2">

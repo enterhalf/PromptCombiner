@@ -54,13 +54,14 @@
     if (!currentFile) return;
 
     const { id, variants } = e.detail;
+    const textBox = currentFile.text_boxes[id];
     appStore.setCurrentFile({
       name: currentFile.name,
       order: currentFile.order,
       heights: currentFile.heights,
-      text_boxes: currentFile.text_boxes,
+      text_boxes: { ...currentFile.text_boxes, [id]: textBox },
       separators: currentFile.separators,
-      variants: { ...currentFile.variants, [id]: variants[id] },
+      variants: { ...currentFile.variants, ...variants },
     });
   }
 
@@ -172,7 +173,13 @@
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const varName = tb.title.trim().toLowerCase().replace(" ", "_");
-        shadowVars.set(varName, tb.content);
+        const currentVariantIndex = tb.currentVariantIndex || 0;
+        let content = tb.content;
+        if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
+          content =
+            currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+        }
+        shadowVars.set(varName, content);
       }
     });
 
@@ -186,7 +193,12 @@
         result += lastSeparator;
       }
 
+      const currentVariantIndex = tb.currentVariantIndex || 0;
       let content = tb.content;
+      if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
+        content =
+          currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+      }
 
       shadowVars.forEach((value, key) => {
         const placeholder = `{{${key}}}`;
@@ -264,36 +276,3 @@
   </div>
 </div>
 
-{#if $appStore.showGeneratedModal}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div
-      class="bg-gray-800 rounded-lg p-6 w-[800px] max-h-[80vh] flex flex-col"
-    >
-      <h2 class="text-white text-lg font-bold mb-4">Generated Text</h2>
-      <div class="flex-1 overflow-y-auto mb-4">
-        <textarea
-          readonly
-          value={$appStore.generatedText}
-          class="w-full h-64 bg-gray-900 text-white p-3 rounded resize-none"
-        ></textarea>
-      </div>
-      <div class="flex justify-end gap-2">
-        <button
-          on:click={() => appStore.setShowGeneratedModal(false)}
-          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
-        >
-          Close
-        </button>
-        <button
-          on:click={async () => {
-            await navigator.clipboard.writeText($appStore.generatedText);
-            alert("Copied to clipboard!");
-          }}
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-        >
-          Copy
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}

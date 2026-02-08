@@ -5,7 +5,7 @@
   export let textBox: TextBox;
   export let index: number;
   export let height: number = 150;
-  export let variants: Record<string, string> = {};
+  export let variants: Record<string, string[]> = {};
 
   const dispatch = createEventDispatcher();
 
@@ -21,6 +21,9 @@
   let slideContainerWidth = 0;
   let variantWidth = 0;
   let slideContainer: HTMLElement;
+  let titleInput: HTMLInputElement;
+  let isTitleFocused = false;
+  let hasCustomTitle = false;
 
   $: variantList = variants[textBox.id]
     ? [textBox.content, ...variants[textBox.id]]
@@ -73,12 +76,19 @@
   function handleTitleInput(e: Event) {
     const input = e.target as HTMLInputElement;
     textBox.title = input.value;
+    hasCustomTitle = input.value.trim().length > 0;
     dispatch("change", { textBox });
   }
 
+  function handleTitleFocus() {
+    isTitleFocused = true;
+  }
+
   function handleTitleBlur(e: Event) {
+    isTitleFocused = false;
     const input = e.target as HTMLInputElement;
     if (!input.value.trim()) {
+      hasCustomTitle = false;
       updateTitle();
       dispatch("change", { textBox });
     }
@@ -93,6 +103,9 @@
   function handleContentChange(e: Event) {
     const textarea = e.target as HTMLTextAreaElement;
     updateVariantContent(currentVariantIndex, textarea.value);
+    if (!isTitleFocused && !hasCustomTitle) {
+      updateTitle();
+    }
     dispatch("change", { textBox });
   }
 
@@ -122,11 +135,19 @@
       if (!variants[textBox.id]) {
         variants[textBox.id] = [];
       }
+      dispatch("variantschange", {
+        id: textBox.id,
+        variants: { [textBox.id]: variants[textBox.id] },
+      });
     } else {
       if (!variants[textBox.id]) {
         variants[textBox.id] = [];
       }
       variants[textBox.id][variantIndex - 1] = content;
+      dispatch("variantschange", {
+        id: textBox.id,
+        variants: { [textBox.id]: variants[textBox.id] },
+      });
     }
     updateTitle();
   }
@@ -134,9 +155,14 @@
   function updateTitle() {
     const trimmed = currentContent.trim();
     if (trimmed.length > 0) {
-      textBox.title = trimmed.substring(0, Math.min(20, trimmed.length));
+      const autoTitle = trimmed.substring(0, Math.min(20, trimmed.length));
+      if (!hasCustomTitle) {
+        textBox.title = autoTitle;
+      }
     } else {
-      textBox.title = "Untitled";
+      if (!hasCustomTitle) {
+        textBox.title = "Untitled";
+      }
     }
   }
 
@@ -156,7 +182,10 @@
         if (currentVariantIndex >= totalVariants - 1) {
           currentVariantIndex = totalVariants - 2;
         }
-        dispatch("variantschange", { id: textBox.id, variants });
+        dispatch("variantschange", {
+          id: textBox.id,
+          variants: { [textBox.id]: variants[textBox.id] },
+        });
       }
     }
   }
@@ -167,18 +196,25 @@
     }
     variants[textBox.id].push(currentContent);
     currentVariantIndex = variants[textBox.id].length;
-    dispatch("variantschange", { id: textBox.id, variants });
+    dispatch("variantschange", {
+      id: textBox.id,
+      variants: { [textBox.id]: variants[textBox.id] },
+    });
   }
 
   function handlePrevVariant() {
     if (currentVariantIndex > 0) {
       currentVariantIndex--;
+      textBox.currentVariantIndex = currentVariantIndex;
+      dispatch("change", { textBox });
     }
   }
 
   function handleNextVariant() {
     if (currentVariantIndex < totalVariants - 1) {
       currentVariantIndex++;
+      textBox.currentVariantIndex = currentVariantIndex;
+      dispatch("change", { textBox });
     }
   }
 
@@ -238,9 +274,12 @@
       type="text"
       value={textBox.title}
       on:input={handleTitleInput}
+      on:focus={handleTitleFocus}
       on:blur={handleTitleBlur}
-      class="flex-1 bg-transparent text-white font-medium truncate mr-2 focus:outline-none focus:bg-gray-700 rounded px-1"
-      placeholder="Title"
+      class="flex-1 bg-transparent font-medium truncate mr-2 focus:outline-none focus:bg-gray-700 rounded px-1 {hasCustomTitle
+        ? 'text-white'
+        : 'text-gray-500'}"
+      placeholder="Untitled"
     />
 
     <select

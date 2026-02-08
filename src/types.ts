@@ -12,7 +12,7 @@ export interface PromptFile {
   order: string[];
   heights: Record<string, number>;
   text_boxes: Record<string, TextBox>;
-  variants: Record<string, Record<string, string>>;
+  variants: Record<string, string[]>;
   separators: Separator[];
 }
 
