@@ -20,14 +20,22 @@ pub struct Separator {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VariantData {
+    pub height: u32,
+    pub current_variant_index: usize,
+    #[serde(default)]
+    pub variant_data: Vec<String>,
+    #[serde(default)]
+    pub titles: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PromptFile {
     pub name: String,
     pub order: Vec<String>,
-    pub heights: std::collections::HashMap<String, u32>,
     pub text_boxes: std::collections::HashMap<String, TextBox>,
+    pub variants: std::collections::HashMap<String, VariantData>,
     pub separators: Vec<Separator>,
-    #[serde(default)]
-    pub variants: std::collections::HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -94,10 +102,9 @@ fn create_prompt_file(workspace_path: String, name: String) -> Result<String, St
     let prompt_file = PromptFile {
         name: file_name.clone(),
         order: vec![],
-        heights: std::collections::HashMap::new(),
         text_boxes: std::collections::HashMap::new(),
-        separators: vec![],
         variants: std::collections::HashMap::new(),
+        separators: vec![],
     };
 
     let content = serde_json::to_string_pretty(&prompt_file)

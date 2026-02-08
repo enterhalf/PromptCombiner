@@ -70,10 +70,10 @@
   async function handleOpenFile(item: WorkspaceItem) {
     if (item.is_file) {
       try {
-        // Save current file if it exists
         await appStore.saveCurrentFile();
 
         const promptFile = await loadPromptFile(item.path);
+
         appStore.setCurrentFile(promptFile);
       } catch (error) {
         console.error("Failed to load file:", error);
@@ -92,6 +92,12 @@
         await loadWorkspace();
         showNewFileDialog = false;
         newFileName = "";
+
+        const updatedItems = await getWorkspaceItems(workspacePath);
+        const newItem = updatedItems.find((item) => item.path === filePath);
+        if (newItem && newItem.is_file) {
+          await handleOpenFile(newItem);
+        }
       } catch (error) {
         console.error("Failed to create file:", error);
         alert("Failed to create file");

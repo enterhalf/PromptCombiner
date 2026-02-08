@@ -3,16 +3,20 @@ export interface TextBox {
   title: string;
   content: string;
   mode: "normal" | "disabled" | "shadow";
-  variants?: string[];
-  currentVariantIndex?: number;
+}
+
+export interface VariantData {
+  height: number;
+  current_variant_index: number;
+  variant_data: string[];
+  titles?: string[];
 }
 
 export interface PromptFile {
   name: string;
   order: string[];
-  heights: Record<string, number>;
+  variants: Record<string, VariantData>;
   text_boxes: Record<string, TextBox>;
-  variants: Record<string, string[]>;
   separators: Separator[];
 }
 

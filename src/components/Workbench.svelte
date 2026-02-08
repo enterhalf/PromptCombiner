@@ -83,10 +83,9 @@
     appStore.setCurrentFile({
       name: currentFile.name,
       order: newOrder,
-      heights: currentFile.heights,
       text_boxes: currentFile.text_boxes,
+      variants: currentFile.variants,
       separators: currentFile.separators,
-      variants: currentFile.variants || {},
     });
   }
 
@@ -106,11 +105,12 @@
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const varName = tb.title.trim().toLowerCase().replace(" ", "_");
-        const currentVariantIndex = tb.currentVariantIndex || 0;
+        const variantData = currentFile.variants[tb.id];
+        const currentVariantIndex = variantData?.current_variant_index || 0;
         let content = tb.content;
-        if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
+        if (currentVariantIndex > 0 && variantData?.variant_data) {
           content =
-            currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+            variantData.variant_data[currentVariantIndex - 1] || content;
         }
         shadowVars.set(varName, content);
       }
@@ -126,11 +126,11 @@
         result += lastSeparator;
       }
 
-      const currentVariantIndex = tb.currentVariantIndex || 0;
+      const variantData = currentFile.variants[textBoxId];
+      const currentVariantIndex = variantData?.current_variant_index || 0;
       let content = tb.content;
-      if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
-        content =
-          currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+      if (currentVariantIndex > 0 && variantData?.variant_data) {
+        content = variantData.variant_data[currentVariantIndex - 1] || content;
       }
 
       shadowVars.forEach((value, key) => {
@@ -194,7 +194,7 @@
       on:click|stopPropagation
     >
       <h2 class="text-white text-lg font-bold mb-4">Generated Text</h2>
-      <div class="flex-1 overflow-y-auto mb-4">
+      <div class="flex-1 mb-4">
         <textarea
           readonly
           value={$appStore.generatedText}

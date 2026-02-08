@@ -29,10 +29,16 @@
     appStore.setCurrentFile({
       name: currentFile.name,
       order: [...currentFile.order, newId],
-      heights: { ...currentFile.heights, [newId]: 150 },
       text_boxes: { ...currentFile.text_boxes, [newId]: newTextBox },
+      variants: {
+        ...currentFile.variants,
+        [newId]: {
+          height: 150,
+          current_variant_index: 0,
+          variant_data: [],
+        },
+      },
       separators: currentFile.separators,
-      variants: currentFile.variants || {},
     });
   }
 
@@ -43,25 +49,22 @@
     appStore.setCurrentFile({
       name: currentFile.name,
       order: currentFile.order,
-      heights: currentFile.heights,
       text_boxes: { ...currentFile.text_boxes, [textBox.id]: textBox },
-      separators: currentFile.separators,
       variants: currentFile.variants,
+      separators: currentFile.separators,
     });
   }
 
   function handleVariantsChange(e: CustomEvent) {
     if (!currentFile) return;
 
-    const { id, variants } = e.detail;
-    const textBox = currentFile.text_boxes[id];
+    const { id, variantData } = e.detail;
     appStore.setCurrentFile({
       name: currentFile.name,
       order: currentFile.order,
-      heights: currentFile.heights,
-      text_boxes: { ...currentFile.text_boxes, [id]: textBox },
+      text_boxes: currentFile.text_boxes,
+      variants: { ...currentFile.variants, [id]: variantData },
       separators: currentFile.separators,
-      variants: { ...currentFile.variants, ...variants },
     });
   }
 
@@ -69,14 +72,19 @@
     if (!currentFile) return;
 
     const { id, height } = e.detail;
-    appStore.setCurrentFile({
-      name: currentFile.name,
-      order: currentFile.order,
-      heights: { ...currentFile.heights, [id]: height },
-      text_boxes: currentFile.text_boxes,
-      separators: currentFile.separators,
-      variants: currentFile.variants || {},
-    });
+    const variantData = currentFile.variants[id];
+    if (variantData) {
+      appStore.setCurrentFile({
+        name: currentFile.name,
+        order: currentFile.order,
+        text_boxes: currentFile.text_boxes,
+        variants: {
+          ...currentFile.variants,
+          [id]: { ...variantData, height },
+        },
+        separators: currentFile.separators,
+      });
+    }
   }
 
   function handleTextBoxDelete(e: CustomEvent) {
@@ -86,18 +94,15 @@
     const newOrder = currentFile.order.filter((boxId) => boxId !== id);
     const newTextBoxes = { ...currentFile.text_boxes };
     delete newTextBoxes[id];
-    const newHeights = { ...currentFile.heights };
-    delete newHeights[id];
     const newVariants = { ...currentFile.variants };
     delete newVariants[id];
 
     appStore.setCurrentFile({
       name: currentFile.name,
       order: newOrder,
-      heights: newHeights,
       text_boxes: newTextBoxes,
-      separators: currentFile.separators,
       variants: newVariants,
+      separators: currentFile.separators,
     });
   }
 
@@ -106,10 +111,9 @@
     appStore.setCurrentFile({
       name: currentFile.name,
       order: currentFile.order,
-      heights: currentFile.heights,
       text_boxes: currentFile.text_boxes,
+      variants: currentFile.variants,
       separators: currentFile.separators,
-      variants: currentFile.variants || {},
     });
   }
 
@@ -133,10 +137,9 @@
       appStore.setCurrentFile({
         name: currentFile.name,
         order: newOrder,
-        heights: currentFile.heights,
         text_boxes: currentFile.text_boxes,
+        variants: currentFile.variants,
         separators: currentFile.separators,
-        variants: currentFile.variants || {},
       });
     }
     draggingIndex = null;
@@ -173,11 +176,12 @@
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const varName = tb.title.trim().toLowerCase().replace(" ", "_");
-        const currentVariantIndex = tb.currentVariantIndex || 0;
+        const variantData = currentFile.variants[tb.id];
+        const currentVariantIndex = variantData?.current_variant_index || 0;
         let content = tb.content;
-        if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
+        if (currentVariantIndex > 0 && variantData?.variant_data) {
           content =
-            currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+            variantData.variant_data[currentVariantIndex - 1] || content;
         }
         shadowVars.set(varName, content);
       }
@@ -193,11 +197,11 @@
         result += lastSeparator;
       }
 
-      const currentVariantIndex = tb.currentVariantIndex || 0;
+      const variantData = currentFile.variants[textBoxId];
+      const currentVariantIndex = variantData?.current_variant_index || 0;
       let content = tb.content;
-      if (currentVariantIndex > 0 && currentFile.variants[tb.id]) {
-        content =
-          currentFile.variants[tb.id][currentVariantIndex - 1] || content;
+      if (currentVariantIndex > 0 && variantData?.variant_data) {
+        content = variantData.variant_data[currentVariantIndex - 1] || content;
       }
 
       shadowVars.forEach((value, key) => {
@@ -233,13 +237,13 @@
         <div class="max-w-4xl mx-auto">
           {#each currentFile.order as textBoxId, index (textBoxId)}
             {@const textBox = currentFile.text_boxes[textBoxId]}
-            {#if textBox}
+            {@const variantData = currentFile.variants[textBoxId]}
+            {#if textBox && variantData}
               <div id={textBox.id}>
                 <TextBox
                   {textBox}
                   {index}
-                  height={currentFile.heights[textBoxId] || 150}
-                  variants={currentFile.variants || {}}
+                  {variantData}
                   on:change={handleTextBoxChange}
                   on:heightchange={handleHeightChange}
                   on:delete={handleTextBoxDelete}
@@ -275,4 +279,3 @@
     {/if}
   </div>
 </div>
-

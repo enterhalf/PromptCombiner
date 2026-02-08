@@ -1,11 +1,10 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import type { TextBox } from "../types";
+  import type { TextBox, VariantData } from "../types";
 
   export let textBox: TextBox;
   export let index: number;
-  export let height: number = 150;
-  export let variants: Record<string, string[]> = {};
+  export let variantData: VariantData;
 
   const dispatch = createEventDispatcher();
 
@@ -14,7 +13,6 @@
   let startY = 0;
   let startHeight = 0;
   let isResizing = false;
-  let currentVariantIndex = textBox.currentVariantIndex || 0;
   let slideOffset = 0;
   let isSliding = false;
   let startX = 0;
@@ -24,10 +22,11 @@
   let titleInput: HTMLInputElement;
   let isTitleFocused = false;
   let hasCustomTitle = false;
+  let isEditingTitle = false;
 
-  $: variantList = variants[textBox.id]
-    ? [textBox.content, ...variants[textBox.id]]
-    : [textBox.content];
+  $: height = variantData.height;
+  $: currentVariantIndex = variantData.current_variant_index;
+  $: variantList = [textBox.content, ...(variantData.variant_data || [])];
   $: totalVariants = variantList.length;
   $: currentContent = variantList[currentVariantIndex] || "";
 
@@ -89,8 +88,32 @@
     const input = e.target as HTMLInputElement;
     if (!input.value.trim()) {
       hasCustomTitle = false;
+      isEditingTitle = false;
       updateTitle();
       dispatch("change", { textBox });
+    } else {
+      isEditingTitle = false;
+    }
+  }
+
+  function handleTitleClick() {
+    if (!isEditingTitle) {
+      isEditingTitle = true;
+      setTimeout(() => {
+        if (titleInput) {
+          titleInput.focus();
+          titleInput.select();
+        }
+      }, 0);
+    }
+  }
+
+  function handleTitleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (titleInput) {
+        titleInput.blur();
+      }
     }
   }
 
@@ -106,7 +129,6 @@
     if (!isTitleFocused && !hasCustomTitle) {
       updateTitle();
     }
-    dispatch("change", { textBox });
   }
 
   function handleInput(e: Event) {
@@ -132,21 +154,13 @@
   function updateVariantContent(variantIndex: number, content: string) {
     if (variantIndex === 0) {
       textBox.content = content;
-      if (!variants[textBox.id]) {
-        variants[textBox.id] = [];
-      }
-      dispatch("variantschange", {
-        id: textBox.id,
-        variants: { [textBox.id]: variants[textBox.id] },
-      });
+      dispatch("change", { textBox });
     } else {
-      if (!variants[textBox.id]) {
-        variants[textBox.id] = [];
-      }
-      variants[textBox.id][variantIndex - 1] = content;
+      const newVariantData = [...(variantData.variant_data || [])];
+      newVariantData[variantIndex - 1] = content;
       dispatch("variantschange", {
         id: textBox.id,
-        variants: { [textBox.id]: variants[textBox.id] },
+        variantData: { ...variantData, variant_data: newVariantData },
       });
     }
     updateTitle();
@@ -177,44 +191,59 @@
     }
 
     if (confirm("Delete this variant?")) {
-      if (variants[textBox.id]) {
-        variants[textBox.id].splice(currentVariantIndex - 1, 1);
-        if (currentVariantIndex >= totalVariants - 1) {
-          currentVariantIndex = totalVariants - 2;
-        }
-        dispatch("variantschange", {
-          id: textBox.id,
-          variants: { [textBox.id]: variants[textBox.id] },
-        });
+      const newVariantData = [...(variantData.variant_data || [])];
+      newVariantData.splice(currentVariantIndex - 1, 1);
+      let newIndex = currentVariantIndex;
+      if (currentVariantIndex >= totalVariants - 1) {
+        newIndex = totalVariants - 2;
       }
+      dispatch("variantschange", {
+        id: textBox.id,
+        variantData: {
+          ...variantData,
+          variant_data: newVariantData,
+          current_variant_index: newIndex,
+        },
+      });
     }
   }
 
   function handleAddVariant() {
-    if (!variants[textBox.id]) {
-      variants[textBox.id] = [];
-    }
-    variants[textBox.id].push(currentContent);
-    currentVariantIndex = variants[textBox.id].length;
+    const newVariantData = [
+      ...(variantData.variant_data || []),
+      currentContent,
+    ];
     dispatch("variantschange", {
       id: textBox.id,
-      variants: { [textBox.id]: variants[textBox.id] },
+      variantData: {
+        ...variantData,
+        variant_data: newVariantData,
+        current_variant_index: newVariantData.length,
+      },
     });
   }
 
   function handlePrevVariant() {
     if (currentVariantIndex > 0) {
-      currentVariantIndex--;
-      textBox.currentVariantIndex = currentVariantIndex;
-      dispatch("change", { textBox });
+      dispatch("variantschange", {
+        id: textBox.id,
+        variantData: {
+          ...variantData,
+          current_variant_index: currentVariantIndex - 1,
+        },
+      });
     }
   }
 
   function handleNextVariant() {
     if (currentVariantIndex < totalVariants - 1) {
-      currentVariantIndex++;
-      textBox.currentVariantIndex = currentVariantIndex;
-      dispatch("change", { textBox });
+      dispatch("variantschange", {
+        id: textBox.id,
+        variantData: {
+          ...variantData,
+          current_variant_index: currentVariantIndex + 1,
+        },
+      });
     }
   }
 
@@ -270,17 +299,31 @@
     >
       ☰
     </div>
-    <input
-      type="text"
-      value={textBox.title}
-      on:input={handleTitleInput}
-      on:focus={handleTitleFocus}
-      on:blur={handleTitleBlur}
-      class="flex-1 bg-transparent font-medium truncate mr-2 focus:outline-none focus:bg-gray-700 rounded px-1 {hasCustomTitle
-        ? 'text-white'
-        : 'text-gray-500'}"
-      placeholder="Untitled"
-    />
+    <div class="flex-1 relative mr-2">
+      {#if !isEditingTitle}
+        <div
+          class="font-medium truncate px-1 rounded cursor-pointer hover:bg-gray-700 {hasCustomTitle
+            ? 'text-white'
+            : 'text-gray-500'}"
+          on:click={handleTitleClick}
+          title="Click to edit title"
+        >
+          {textBox.title || "Untitled"}
+        </div>
+      {:else}
+        <input
+          type="text"
+          bind:this={titleInput}
+          value={textBox.title}
+          on:input={handleTitleInput}
+          on:focus={handleTitleFocus}
+          on:blur={handleTitleBlur}
+          on:keydown={handleTitleKeyDown}
+          class="w-full bg-transparent font-medium truncate focus:outline-none focus:bg-gray-700 rounded px-1 text-white"
+          placeholder="Untitled"
+        />
+      {/if}
+    </div>
 
     <select
       value={textBox.mode}
