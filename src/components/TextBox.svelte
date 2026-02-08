@@ -193,9 +193,10 @@
     if (confirm("Delete this variant?")) {
       const newVariantData = [...(variantData.variant_data || [])];
       newVariantData.splice(currentVariantIndex - 1, 1);
+      const newTotalVariants = totalVariants - 1;
       let newIndex = currentVariantIndex;
-      if (currentVariantIndex >= totalVariants - 1) {
-        newIndex = totalVariants - 2;
+      if (currentVariantIndex >= newTotalVariants) {
+        newIndex = newTotalVariants - 1;
       }
       dispatch("variantschange", {
         id: textBox.id,
