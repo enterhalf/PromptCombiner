@@ -20,6 +20,7 @@
 
   function handleDragEnd() {
     isDragging = false;
+    dispatch('dragend');
   }
 
   function handleResizeStart(e: MouseEvent) {
@@ -53,6 +54,12 @@
     textBox.content = textarea.value;
     updateTitle();
     dispatch('change', { textBox });
+  }
+
+  function handleInput(e: Event) {
+    const textarea = e.target as HTMLTextAreaElement;
+    textBox.content = textarea.value;
+    updateTitle();
   }
 
   function updateTitle() {
@@ -153,8 +160,9 @@
     </button>
     
     <textarea
-      bind:value={textBox.content}
-      on:input={handleContentChange}
+      value={textBox.content}
+      on:input={handleInput}
+      on:blur={handleContentChange}
       class="flex-1 bg-gray-900 text-white p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
       placeholder="Enter your text here..."
     ></textarea>

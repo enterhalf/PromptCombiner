@@ -6,7 +6,12 @@
 
   const dispatch = createEventDispatcher();
 
-  function handleContentChange(e: Event) {
+  function handleInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    separator.content = input.value;
+  }
+
+  function handleBlur(e: Event) {
     const input = e.target as HTMLInputElement;
     separator.content = input.value;
     dispatch('change', { separator });
@@ -22,7 +27,8 @@
   <input
     type="text"
     value={separator.content}
-    on:input={handleContentChange}
+    on:input={handleInput}
+    on:blur={handleBlur}
     class="flex-1 bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
     placeholder="\\n\\n"
   />

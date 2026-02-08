@@ -38,8 +38,14 @@
       appStore.setGeneratedText(generated);
       appStore.setShowGeneratedModal(true);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Failed to generate context:', error);
-      alert('Failed to generate context');
+      
+      if (errorMessage.includes('Tauri') || errorMessage.includes('invoke')) {
+        alert('This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".');
+      } else {
+        alert(`Failed to generate context: ${errorMessage}`);
+      }
     }
   }
 
@@ -63,9 +69,16 @@
     try {
       const filePath = `${$appStore.workspacePath}/${currentFile.name}`;
       await savePromptFile(filePath, currentFile);
+      alert('File saved successfully!');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('Failed to save:', error);
-      alert('Failed to save file');
+      
+      if (errorMessage.includes('Tauri') || errorMessage.includes('invoke')) {
+        alert('This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".');
+      } else {
+        alert(`Failed to save file: ${errorMessage}`);
+      }
     }
   }
 
@@ -73,11 +86,11 @@
     draggingItem = index;
   }
 
-  function handleDragOver(e: DragEvent, index: number) {
+  function handleDragOver(e: any, index: number) {
     e.preventDefault();
   }
 
-  function handleDrop(e: DragEvent, index: number) {
+  function handleDrop(e: any, index: number) {
     e.preventDefault();
     if (draggingItem !== null && draggingItem !== index) {
       const item = outlineItems[draggingItem];
@@ -104,8 +117,11 @@
       }
     });
     
-    currentFile.text_boxes = newTextBoxes;
-    currentFile.separators = newSeparators;
+    appStore.setCurrentFile({
+      name: currentFile.name,
+      text_boxes: newTextBoxes,
+      separators: newSeparators
+    });
   }
 
   function handleOutlineClick(id: string) {
@@ -113,6 +129,51 @@
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  }
+
+  function generatedPreview() {
+    if (!currentFile) return '';
+    
+    let result = '';
+    const separatorMap = new Map<string, string>();
+    
+    currentFile.separators.forEach(sep => {
+      separatorMap.set(sep.id, sep.content);
+    });
+    
+    const shadowVars = new Map<string, string>();
+    
+    currentFile.text_boxes.forEach(tb => {
+      if (tb.mode === 'shadow') {
+        const varName = tb.title.trim().toLowerCase().replace(/\s+/g, '_');
+        shadowVars.set(varName, tb.content);
+      }
+    });
+    
+    let lastSeparator = '\n\n';
+    
+    currentFile.text_boxes.forEach((tb, index) => {
+      if (tb.mode === 'disabled') return;
+      
+      if (index > 0) {
+        const sepKey = `sep_${index - 1}`;
+        if (separatorMap.has(sepKey)) {
+          lastSeparator = separatorMap.get(sepKey)!;
+        }
+        result += lastSeparator;
+      }
+      
+      let content = tb.content;
+      
+      shadowVars.forEach((value, key) => {
+        const placeholder = `{{${key}}}`;
+        content = content.replace(new RegExp(placeholder, 'g'), value);
+      });
+      
+      result += content;
+    });
+    
+    return result;
   }
 </script>
 
