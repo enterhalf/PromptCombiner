@@ -4,6 +4,7 @@
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
   import Separator from "./components/Separator.svelte";
+  import Workbench from "./components/Workbench.svelte";
   import type {
     TextBox as TextBoxType,
     Separator as SeparatorType,
@@ -21,20 +22,19 @@
   function addTextBox() {
     if (!currentFile) return;
 
+    const newId = generateId();
     const newTextBox: TextBoxType = {
-      id: generateId(),
+      id: newId,
       title: "Untitled",
       content: "",
       mode: "normal",
-      checked: true,
-      height: 150,
-      variants: [""],
-      currentVariant: 0,
     };
 
     appStore.setCurrentFile({
       name: currentFile.name,
-      text_boxes: [...currentFile.text_boxes, newTextBox],
+      order: [...currentFile.order, newId],
+      heights: { ...currentFile.heights, [newId]: 150 },
+      text_boxes: { ...currentFile.text_boxes, [newId]: newTextBox },
       separators: currentFile.separators,
     });
   }
@@ -58,27 +58,43 @@
     if (!currentFile) return;
 
     const { textBox } = e.detail;
-    const index = currentFile.text_boxes.findIndex(
-      (tb) => tb.id === textBox.id
-    );
-    if (index !== -1) {
-      const newTextBoxes = [...currentFile.text_boxes];
-      newTextBoxes[index] = textBox;
-      appStore.setCurrentFile({
-        name: currentFile.name,
-        text_boxes: newTextBoxes,
-        separators: currentFile.separators,
-      });
-    }
+    appStore.setCurrentFile({
+      name: currentFile.name,
+      order: currentFile.order,
+      heights: currentFile.heights,
+      text_boxes: { ...currentFile.text_boxes, [textBox.id]: textBox },
+      separators: currentFile.separators,
+    });
+  }
+
+  function handleHeightChange(e: CustomEvent) {
+    if (!currentFile) return;
+
+    const { id, height } = e.detail;
+    appStore.setCurrentFile({
+      name: currentFile.name,
+      order: currentFile.order,
+      heights: { ...currentFile.heights, [id]: height },
+      text_boxes: currentFile.text_boxes,
+      separators: currentFile.separators,
+    });
   }
 
   function handleTextBoxDelete(e: CustomEvent) {
     if (!currentFile) return;
 
     const { id } = e.detail;
+    const newOrder = currentFile.order.filter((boxId) => boxId !== id);
+    const newTextBoxes = { ...currentFile.text_boxes };
+    delete newTextBoxes[id];
+    const newHeights = { ...currentFile.heights };
+    delete newHeights[id];
+
     appStore.setCurrentFile({
       name: currentFile.name,
-      text_boxes: currentFile.text_boxes.filter((tb) => tb.id !== id),
+      order: newOrder,
+      heights: newHeights,
+      text_boxes: newTextBoxes,
       separators: currentFile.separators,
     });
   }
@@ -87,6 +103,8 @@
     if (!currentFile) return;
     appStore.setCurrentFile({
       name: currentFile.name,
+      order: currentFile.order,
+      heights: currentFile.heights,
       text_boxes: currentFile.text_boxes,
       separators: currentFile.separators,
     });
@@ -133,13 +151,15 @@
     e.preventDefault();
     if (!currentFile) return;
     if (draggingIndex !== null && draggingIndex !== index) {
-      const newTextBoxes = [...currentFile.text_boxes];
-      const item = newTextBoxes[draggingIndex];
-      newTextBoxes.splice(draggingIndex, 1);
-      newTextBoxes.splice(index, 0, item);
+      const newOrder = [...currentFile.order];
+      const item = newOrder[draggingIndex];
+      newOrder.splice(draggingIndex, 1);
+      newOrder.splice(index, 0, item);
       appStore.setCurrentFile({
         name: currentFile.name,
-        text_boxes: newTextBoxes,
+        order: newOrder,
+        heights: currentFile.heights,
+        text_boxes: currentFile.text_boxes,
         separators: currentFile.separators,
       });
     }
@@ -180,7 +200,7 @@
 
     let shadowVars = new Map();
 
-    currentFile.text_boxes.forEach((tb) => {
+    Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const varName = tb.title.trim().toLowerCase().replace(" ", "_");
         shadowVars.set(varName, tb.content);
@@ -189,8 +209,9 @@
 
     let lastSeparator = "\n\n";
 
-    currentFile.text_boxes.forEach((tb, index) => {
-      if (tb.mode === "disabled") return;
+    currentFile.order.forEach((textBoxId, index) => {
+      const tb = currentFile.text_boxes[textBoxId];
+      if (!tb || tb.mode === "disabled") return;
 
       if (index > 0) {
         const sepIndex = index - 1;
@@ -216,26 +237,9 @@
 
 <div class="flex h-screen bg-gray-900">
   <Sidebar>
-    {#if activeTab === "workbench"}
+    {#if activeTab === "workbench" && currentFile}
       <slot name="workbench">
-        <div class="flex-1 flex flex-col h-full bg-gray-900 p-4">
-          <div class="flex gap-2 mb-4">
-            <button
-              on:click={handleSave}
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-            >
-              Save
-            </button>
-          </div>
-
-          <div class="flex-1 overflow-y-auto">
-            <h3 class="text-white font-bold mb-2">Preview</h3>
-            <div class="bg-gray-800 rounded-lg p-4 min-h-64">
-              <pre
-                class="text-gray-300 text-sm whitespace-pre-wrap break-words">{generatePreview()}</pre>
-            </div>
-          </div>
-        </div>
+        <Workbench {currentFile} />
       </slot>
     {/if}
   </Sidebar>
@@ -246,37 +250,28 @@
         class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-center justify-between"
       >
         <h2 class="text-white font-bold">{currentFile.name}</h2>
-        <div class="flex gap-2">
-          <button
-            on:click={addTextBox}
-            class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-          >
-            + Text Box
-          </button>
-          <button
-            on:click={addSeparator}
-            class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm"
-          >
-            + Separator
-          </button>
-        </div>
       </div>
 
       <div class="flex-1 overflow-y-auto p-4">
         <div class="max-w-4xl mx-auto">
-          {#each currentFile.text_boxes as textBox, index (textBox.id)}
-            <div id={textBox.id}>
-              <TextBox
-                {textBox}
-                {index}
-                on:change={handleTextBoxChange}
-                on:delete={handleTextBoxDelete}
-                on:dragend={handleTextBoxDragEnd}
-                on:dragstart={() => handleDragStart(index)}
-                on:dragover={handleDragOver}
-                on:drop={(e) => handleDrop(e, index)}
-              />
-            </div>
+          {#each currentFile.order as textBoxId, index (textBoxId)}
+            {@const textBox = currentFile.text_boxes[textBoxId]}
+            {#if textBox}
+              <div id={textBox.id}>
+                <TextBox
+                  {textBox}
+                  {index}
+                  height={currentFile.heights[textBoxId] || 150}
+                  on:change={handleTextBoxChange}
+                  on:heightchange={handleHeightChange}
+                  on:delete={handleTextBoxDelete}
+                  on:dragend={handleTextBoxDragEnd}
+                  on:dragstart={() => handleDragStart(index)}
+                  on:dragover={handleDragOver}
+                  on:drop={(e) => handleDrop(e, index)}
+                />
+              </div>
+            {/if}
           {/each}
 
           {#each currentFile.separators as separator (separator.id)}
@@ -288,6 +283,21 @@
               />
             </div>
           {/each}
+
+          <div class="flex gap-2 mt-4">
+            <button
+              on:click={addTextBox}
+              class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
+            >
+              + Text Box
+            </button>
+            <button
+              on:click={addSeparator}
+              class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm"
+            >
+              + Separator
+            </button>
+          </div>
         </div>
       </div>
     {:else}

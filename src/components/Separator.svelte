@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import type { Separator } from '../types';
+  import { createEventDispatcher } from "svelte";
+  import type { Separator } from "../types";
 
   export let separator: Separator;
 
@@ -14,11 +14,11 @@
   function handleBlur(e: Event) {
     const input = e.target as HTMLInputElement;
     separator.content = input.value;
-    dispatch('change', { separator });
+    dispatch("change", { separator });
   }
 
   function handleDelete() {
-    dispatch('delete', { id: separator.id });
+    dispatch("delete", { id: separator.id });
   }
 </script>
 

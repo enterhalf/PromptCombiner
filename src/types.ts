@@ -2,11 +2,7 @@ export interface TextBox {
   id: string;
   title: string;
   content: string;
-  mode: 'normal' | 'disabled' | 'shadow';
-  checked: boolean;
-  height: number;
-  variants: string[];
-  currentVariant: number;
+  mode: "normal" | "disabled" | "shadow";
 }
 
 export interface Separator {
@@ -16,7 +12,9 @@ export interface Separator {
 
 export interface PromptFile {
   name: string;
-  text_boxes: TextBox[];
+  order: string[];
+  heights: Record<string, number>;
+  text_boxes: Record<string, TextBox>;
   separators: Separator[];
 }
 
@@ -30,7 +28,7 @@ export interface AppState {
   workspacePath: string;
   currentFile: PromptFile | null;
   workspaceItems: WorkspaceItem[];
-  activeTab: 'files' | 'workbench';
+  activeTab: "files" | "workbench";
   generatedText: string;
   showGeneratedModal: boolean;
 }

@@ -1,11 +1,15 @@
 <script lang="ts">
-  import { appStore } from '../store';
-  import { generateContext, savePromptFile } from '../tauri-api';
-  import type { PromptFile, TextBox, Separator } from '../types';
+  import { appStore } from "../store";
+  import { generateContext, savePromptFile } from "../tauri-api";
+  import type { PromptFile, TextBox, Separator } from "../types";
 
   export let currentFile: PromptFile;
 
-  let outlineItems: Array<{ id: string; title: string; type: 'textbox' | 'separator' }> = [];
+  let outlineItems: Array<{
+    id: string;
+    title: string;
+    type: "textbox" | "separator";
+  }> = [];
   let draggingItem: number | null = null;
 
   $: if (currentFile) {
@@ -14,35 +18,41 @@
 
   function updateOutline() {
     outlineItems = [];
-    currentFile.text_boxes.forEach((tb, index) => {
-      outlineItems.push({
-        id: tb.id,
-        title: tb.title || `Text Box ${index + 1}`,
-        type: 'textbox'
-      });
+    currentFile.order.forEach((textBoxId, index) => {
+      const tb = currentFile.text_boxes[textBoxId];
+      if (tb) {
+        outlineItems.push({
+          id: tb.id,
+          title: tb.title || `Text Box ${index + 1}`,
+          type: "textbox",
+        });
+      }
     });
     currentFile.separators.forEach((sep, index) => {
       outlineItems.push({
         id: sep.id,
         title: `Separator ${index + 1}`,
-        type: 'separator'
+        type: "separator",
       });
     });
   }
 
   async function handleGenerate() {
     if (!currentFile) return;
-    
+
     try {
       const generated = await generateContext(currentFile);
       appStore.setGeneratedText(generated);
       appStore.setShowGeneratedModal(true);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Failed to generate context:', error);
-      
-      if (errorMessage.includes('Tauri') || errorMessage.includes('invoke')) {
-        alert('This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".');
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error("Failed to generate context:", error);
+
+      if (errorMessage.includes("Tauri") || errorMessage.includes("invoke")) {
+        alert(
+          'This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".'
+        );
       } else {
         alert(`Failed to generate context: ${errorMessage}`);
       }
@@ -51,31 +61,34 @@
 
   async function handleGenerateAndCopy() {
     await handleGenerate();
-    
+
     if ($appStore.generatedText) {
       try {
         await navigator.clipboard.writeText($appStore.generatedText);
-        alert('Copied to clipboard!');
+        alert("Copied to clipboard!");
       } catch (error) {
-        console.error('Failed to copy:', error);
-        alert('Failed to copy to clipboard');
+        console.error("Failed to copy:", error);
+        alert("Failed to copy to clipboard");
       }
     }
   }
 
   async function handleSave() {
     if (!currentFile || !$appStore.workspacePath) return;
-    
+
     try {
       const filePath = `${$appStore.workspacePath}/${currentFile.name}`;
       await savePromptFile(filePath, currentFile);
-      alert('File saved successfully!');
+      alert("File saved successfully!");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Failed to save:', error);
-      
-      if (errorMessage.includes('Tauri') || errorMessage.includes('invoke')) {
-        alert('This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".');
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error("Failed to save:", error);
+
+      if (errorMessage.includes("Tauri") || errorMessage.includes("invoke")) {
+        alert(
+          'This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".'
+        );
       } else {
         alert(`Failed to save file: ${errorMessage}`);
       }
@@ -96,83 +109,88 @@
       const item = outlineItems[draggingItem];
       outlineItems.splice(draggingItem, 1);
       outlineItems.splice(index, 0, item);
-      
+
       reorderItems();
     }
     draggingItem = null;
   }
 
   function reorderItems() {
-    const newTextBoxes: TextBox[] = [];
+    const newOrder: string[] = [];
+    const newTextBoxes: Record<string, TextBox> = {};
     const newSeparators: Separator[] = [];
-    
-    outlineItems.forEach(item => {
-      const tb = currentFile.text_boxes.find(t => t.id === item.id);
-      const sep = currentFile.separators.find(s => s.id === item.id);
-      
+
+    outlineItems.forEach((item) => {
+      const tb = currentFile.text_boxes[item.id];
+      const sep = currentFile.separators.find((s) => s.id === item.id);
+
       if (tb) {
-        newTextBoxes.push(tb);
+        newOrder.push(item.id);
+        newTextBoxes[item.id] = tb;
       } else if (sep) {
         newSeparators.push(sep);
       }
     });
-    
+
     appStore.setCurrentFile({
       name: currentFile.name,
+      order: newOrder,
+      heights: currentFile.heights,
       text_boxes: newTextBoxes,
-      separators: newSeparators
+      separators: newSeparators,
     });
   }
 
   function handleOutlineClick(id: string) {
     const element = document.getElementById(id);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }
 
-  function generatedPreview() {
-    if (!currentFile) return '';
-    
-    let result = '';
-    const separatorMap = new Map<string, string>();
-    
-    currentFile.separators.forEach(sep => {
-      separatorMap.set(sep.id, sep.content);
+  function generatePreview() {
+    if (!currentFile) return "";
+
+    let result = "";
+    let separatorMap = new Map();
+
+    currentFile.separators.forEach((sep, index) => {
+      separatorMap.set(index, sep.content);
     });
-    
-    const shadowVars = new Map<string, string>();
-    
-    currentFile.text_boxes.forEach(tb => {
-      if (tb.mode === 'shadow') {
-        const varName = tb.title.trim().toLowerCase().replace(/\s+/g, '_');
+
+    let shadowVars = new Map();
+
+    Object.values(currentFile.text_boxes).forEach((tb) => {
+      if (tb.mode === "shadow") {
+        const varName = tb.title.trim().toLowerCase().replace(" ", "_");
         shadowVars.set(varName, tb.content);
       }
     });
-    
-    let lastSeparator = '\n\n';
-    
-    currentFile.text_boxes.forEach((tb, index) => {
-      if (tb.mode === 'disabled') return;
-      
+
+    let lastSeparator = "\n\n";
+
+    currentFile.order.forEach((textBoxId, index) => {
+      const tb = currentFile.text_boxes[textBoxId];
+      if (!tb || tb.mode === "disabled") return;
+
       if (index > 0) {
-        const sepKey = `sep_${index - 1}`;
-        if (separatorMap.has(sepKey)) {
-          lastSeparator = separatorMap.get(sepKey)!;
+        const sepIndex = index - 1;
+        if (separatorMap.has(sepIndex)) {
+          lastSeparator = separatorMap.get(sepIndex);
         }
         result += lastSeparator;
       }
-      
+
       let content = tb.content;
-      
+
       shadowVars.forEach((value, key) => {
         const placeholder = `{{${key}}}`;
-        content = content.replace(new RegExp(placeholder, 'g'), value);
+        content = content.replace(new RegExp(placeholder, "g"), value);
       });
-      
+
       result += content;
     });
-    
+
     return result;
   }
 </script>
@@ -214,7 +232,7 @@
           >
             <span class="mr-2 text-gray-400">☰</span>
             <span class="mr-2">
-              {item.type === 'textbox' ? '📝' : '🔀'}
+              {item.type === "textbox" ? "📝" : "🔀"}
             </span>
             <span class="text-gray-300 text-sm truncate flex-1">
               {item.title}
@@ -227,7 +245,8 @@
     <div class="flex-1 overflow-y-auto">
       <h3 class="text-white font-bold mb-2">Preview</h3>
       <div class="bg-gray-800 rounded-lg p-4 min-h-64">
-        <pre class="text-gray-300 text-sm whitespace-pre-wrap break-words">{generatedPreview()}</pre>
+        <pre
+          class="text-gray-300 text-sm whitespace-pre-wrap break-words">{generatePreview()}</pre>
       </div>
     </div>
   </div>
@@ -235,7 +254,9 @@
 
 {#if $appStore.showGeneratedModal}
   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-lg p-6 w-[800px] max-h-[80vh] flex flex-col">
+    <div
+      class="bg-gray-800 rounded-lg p-6 w-[800px] max-h-[80vh] flex flex-col"
+    >
       <h2 class="text-white text-lg font-bold mb-4">Generated Text</h2>
       <div class="flex-1 overflow-y-auto mb-4">
         <textarea
@@ -254,7 +275,7 @@
         <button
           on:click={async () => {
             await navigator.clipboard.writeText($appStore.generatedText);
-            alert('Copied to clipboard!');
+            alert("Copied to clipboard!");
           }}
           class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         >

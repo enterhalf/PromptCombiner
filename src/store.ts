@@ -1,14 +1,14 @@
-import { writable, get } from 'svelte/store';
-import type { AppState, PromptFile, WorkspaceItem } from './types';
-import { savePromptFile } from './tauri-api';
+import { writable, get } from "svelte/store";
+import type { AppState, PromptFile, WorkspaceItem } from "./types";
+import { savePromptFile } from "./tauri-api";
 
 const defaultState: AppState = {
-  workspacePath: '',
+  workspacePath: "",
   currentFile: null,
   workspaceItems: [],
-  activeTab: 'files',
-  generatedText: '',
-  showGeneratedModal: false
+  activeTab: "files",
+  generatedText: "",
+  showGeneratedModal: false,
 };
 
 let autoSaveTimeout: number | null = null;
@@ -23,7 +23,7 @@ function createAppStore() {
         const filePath = `${state.workspacePath}/${state.currentFile.name}`;
         await savePromptFile(filePath, state.currentFile);
       } catch (error) {
-        console.error('Auto-save failed:', error);
+        console.error("Auto-save failed:", error);
       }
     }
   }
@@ -45,7 +45,7 @@ function createAppStore() {
         await savePromptFile(filePath, state.currentFile);
         return true;
       } catch (error) {
-        console.error('Save failed:', error);
+        console.error("Save failed:", error);
         return false;
       }
     }
@@ -54,17 +54,22 @@ function createAppStore() {
 
   return {
     subscribe,
-    setWorkspacePath: (path: string) => update(s => ({ ...s, workspacePath: path })),
+    setWorkspacePath: (path: string) =>
+      update((s) => ({ ...s, workspacePath: path })),
     setCurrentFile: (file: PromptFile | null) => {
-      update(s => ({ ...s, currentFile: file }));
+      update((s) => ({ ...s, currentFile: file }));
       triggerAutoSave();
     },
-    setWorkspaceItems: (items: WorkspaceItem[]) => update(s => ({ ...s, workspaceItems: items })),
-    setActiveTab: (tab: 'files' | 'workbench') => update(s => ({ ...s, activeTab: tab })),
-    setGeneratedText: (text: string) => update(s => ({ ...s, generatedText: text })),
-    setShowGeneratedModal: (show: boolean) => update(s => ({ ...s, showGeneratedModal: show })),
+    setWorkspaceItems: (items: WorkspaceItem[]) =>
+      update((s) => ({ ...s, workspaceItems: items })),
+    setActiveTab: (tab: "files" | "workbench") =>
+      update((s) => ({ ...s, activeTab: tab })),
+    setGeneratedText: (text: string) =>
+      update((s) => ({ ...s, generatedText: text })),
+    setShowGeneratedModal: (show: boolean) =>
+      update((s) => ({ ...s, showGeneratedModal: show })),
     reset: () => set(defaultState),
-    saveCurrentFile
+    saveCurrentFile,
   };
 }
 
