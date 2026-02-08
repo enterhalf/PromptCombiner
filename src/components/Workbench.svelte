@@ -109,6 +109,7 @@
       heights: currentFile.heights,
       text_boxes: currentFile.text_boxes,
       separators: currentFile.separators,
+      variants: currentFile.variants || {},
     });
   }
 

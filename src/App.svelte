@@ -32,6 +32,7 @@
       heights: { ...currentFile.heights, [newId]: 150 },
       text_boxes: { ...currentFile.text_boxes, [newId]: newTextBox },
       separators: currentFile.separators,
+      variants: currentFile.variants || {},
     });
   }
 
@@ -45,6 +46,21 @@
       heights: currentFile.heights,
       text_boxes: { ...currentFile.text_boxes, [textBox.id]: textBox },
       separators: currentFile.separators,
+      variants: currentFile.variants,
+    });
+  }
+
+  function handleVariantsChange(e: CustomEvent) {
+    if (!currentFile) return;
+
+    const { id, variants } = e.detail;
+    appStore.setCurrentFile({
+      name: currentFile.name,
+      order: currentFile.order,
+      heights: currentFile.heights,
+      text_boxes: currentFile.text_boxes,
+      separators: currentFile.separators,
+      variants: { ...currentFile.variants, [id]: variants[id] },
     });
   }
 
@@ -58,6 +74,7 @@
       heights: { ...currentFile.heights, [id]: height },
       text_boxes: currentFile.text_boxes,
       separators: currentFile.separators,
+      variants: currentFile.variants || {},
     });
   }
 
@@ -70,6 +87,8 @@
     delete newTextBoxes[id];
     const newHeights = { ...currentFile.heights };
     delete newHeights[id];
+    const newVariants = { ...currentFile.variants };
+    delete newVariants[id];
 
     appStore.setCurrentFile({
       name: currentFile.name,
@@ -77,6 +96,7 @@
       heights: newHeights,
       text_boxes: newTextBoxes,
       separators: currentFile.separators,
+      variants: newVariants,
     });
   }
 
@@ -88,6 +108,7 @@
       heights: currentFile.heights,
       text_boxes: currentFile.text_boxes,
       separators: currentFile.separators,
+      variants: currentFile.variants || {},
     });
   }
 
@@ -97,6 +118,7 @@
 
   function handleDragOver(e: any) {
     e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
   }
 
   function handleDrop(e: any, index: number) {
@@ -113,6 +135,7 @@
         heights: currentFile.heights,
         text_boxes: currentFile.text_boxes,
         separators: currentFile.separators,
+        variants: currentFile.variants || {},
       });
     }
     draggingIndex = null;
@@ -179,11 +202,11 @@
 
 <div class="flex h-screen bg-gray-900">
   <Sidebar>
-    {#if activeTab === "workbench" && currentFile}
-      <slot name="workbench">
+    <svelte:fragment slot="workbench">
+      {#if activeTab === "workbench" && currentFile}
         <Workbench {currentFile} />
-      </slot>
-    {/if}
+      {/if}
+    </svelte:fragment>
   </Sidebar>
 
   <div class="flex-1 flex flex-col h-full overflow-hidden">
@@ -204,10 +227,12 @@
                   {textBox}
                   {index}
                   height={currentFile.heights[textBoxId] || 150}
+                  variants={currentFile.variants || {}}
                   on:change={handleTextBoxChange}
                   on:heightchange={handleHeightChange}
                   on:delete={handleTextBoxDelete}
                   on:dragend={handleTextBoxDragEnd}
+                  on:variantschange={handleVariantsChange}
                   on:dragstart={() => handleDragStart(index)}
                   on:dragover={handleDragOver}
                   on:drop={(e) => handleDrop(e, index)}

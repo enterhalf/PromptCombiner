@@ -3,6 +3,8 @@ export interface TextBox {
   title: string;
   content: string;
   mode: "normal" | "disabled" | "shadow";
+  variants?: string[];
+  currentVariantIndex?: number;
 }
 
 export interface PromptFile {
@@ -10,6 +12,7 @@ export interface PromptFile {
   order: string[];
   heights: Record<string, number>;
   text_boxes: Record<string, TextBox>;
+  variants: Record<string, Record<string, string>>;
   separators: Separator[];
 }
 
