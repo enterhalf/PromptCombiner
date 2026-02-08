@@ -3,12 +3,8 @@
   import { savePromptFile } from "./tauri-api";
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
-  import Separator from "./components/Separator.svelte";
   import Workbench from "./components/Workbench.svelte";
-  import type {
-    TextBox as TextBoxType,
-    Separator as SeparatorType,
-  } from "./types";
+  import type { TextBox as TextBoxType } from "./types";
 
   let draggingIndex: number | null = null;
 
@@ -36,21 +32,6 @@
       heights: { ...currentFile.heights, [newId]: 150 },
       text_boxes: { ...currentFile.text_boxes, [newId]: newTextBox },
       separators: currentFile.separators,
-    });
-  }
-
-  function addSeparator() {
-    if (!currentFile) return;
-
-    const newSeparator: SeparatorType = {
-      id: generateId(),
-      content: "\\n\\n",
-    };
-
-    appStore.setCurrentFile({
-      name: currentFile.name,
-      text_boxes: currentFile.text_boxes,
-      separators: [...currentFile.separators, newSeparator],
     });
   }
 
@@ -110,35 +91,6 @@
     });
   }
 
-  function handleSeparatorChange(e: CustomEvent) {
-    if (!currentFile) return;
-
-    const { separator } = e.detail;
-    const index = currentFile.separators.findIndex(
-      (s) => s.id === separator.id
-    );
-    if (index !== -1) {
-      const newSeparators = [...currentFile.separators];
-      newSeparators[index] = separator;
-      appStore.setCurrentFile({
-        name: currentFile.name,
-        text_boxes: currentFile.text_boxes,
-        separators: newSeparators,
-      });
-    }
-  }
-
-  function handleSeparatorDelete(e: CustomEvent) {
-    if (!currentFile) return;
-
-    const { id } = e.detail;
-    appStore.setCurrentFile({
-      name: currentFile.name,
-      text_boxes: currentFile.text_boxes,
-      separators: currentFile.separators.filter((s) => s.id !== id),
-    });
-  }
-
   function handleDragStart(index: number) {
     draggingIndex = index;
   }
@@ -192,12 +144,6 @@
     if (!currentFile) return "";
 
     let result = "";
-    let separatorMap = new Map();
-
-    currentFile.separators.forEach((sep, index) => {
-      separatorMap.set(index, sep.content);
-    });
-
     let shadowVars = new Map();
 
     Object.values(currentFile.text_boxes).forEach((tb) => {
@@ -214,10 +160,6 @@
       if (!tb || tb.mode === "disabled") return;
 
       if (index > 0) {
-        const sepIndex = index - 1;
-        if (separatorMap.has(sepIndex)) {
-          lastSeparator = separatorMap.get(sepIndex);
-        }
         result += lastSeparator;
       }
 
@@ -274,28 +216,12 @@
             {/if}
           {/each}
 
-          {#each currentFile.separators as separator (separator.id)}
-            <div id={separator.id}>
-              <Separator
-                {separator}
-                on:change={handleSeparatorChange}
-                on:delete={handleSeparatorDelete}
-              />
-            </div>
-          {/each}
-
           <div class="flex gap-2 mt-4">
             <button
               on:click={addTextBox}
               class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
             >
               + Text Box
-            </button>
-            <button
-              on:click={addSeparator}
-              class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm"
-            >
-              + Separator
             </button>
           </div>
         </div>

@@ -1,14 +1,14 @@
 <script lang="ts">
   import { appStore } from "../store";
-  import { generateContext, savePromptFile } from "../tauri-api";
-  import type { PromptFile, TextBox, Separator } from "../types";
+  import { savePromptFile } from "../tauri-api";
+  import type { PromptFile, TextBox } from "../types";
 
   export let currentFile: PromptFile;
 
   let outlineItems: Array<{
     id: string;
     title: string;
-    type: "textbox" | "separator";
+    type: "textbox";
   }> = [];
   let draggingItem: number | null = null;
 
@@ -21,46 +21,27 @@
     currentFile.order.forEach((textBoxId, index) => {
       const tb = currentFile.text_boxes[textBoxId];
       if (tb) {
+        const title =
+          tb.title || tb.content.substring(0, 20) || `Text Box ${index + 1}`;
         outlineItems.push({
           id: tb.id,
-          title: tb.title || `Text Box ${index + 1}`,
+          title: title,
           type: "textbox",
         });
       }
     });
-    currentFile.separators.forEach((sep, index) => {
-      outlineItems.push({
-        id: sep.id,
-        title: `Separator ${index + 1}`,
-        type: "separator",
-      });
-    });
   }
 
-  async function handleGenerate() {
+  function handleGenerate() {
     if (!currentFile) return;
 
-    try {
-      const generated = await generateContext(currentFile);
-      appStore.setGeneratedText(generated);
-      appStore.setShowGeneratedModal(true);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error("Failed to generate context:", error);
-
-      if (errorMessage.includes("Tauri") || errorMessage.includes("invoke")) {
-        alert(
-          'This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".'
-        );
-      } else {
-        alert(`Failed to generate context: ${errorMessage}`);
-      }
-    }
+    const generated = generatePreview();
+    appStore.setGeneratedText(generated);
+    appStore.setShowGeneratedModal(true);
   }
 
   async function handleGenerateAndCopy() {
-    await handleGenerate();
+    handleGenerate();
 
     if ($appStore.generatedText) {
       try {
@@ -117,27 +98,17 @@
 
   function reorderItems() {
     const newOrder: string[] = [];
-    const newTextBoxes: Record<string, TextBox> = {};
-    const newSeparators: Separator[] = [];
 
     outlineItems.forEach((item) => {
-      const tb = currentFile.text_boxes[item.id];
-      const sep = currentFile.separators.find((s) => s.id === item.id);
-
-      if (tb) {
-        newOrder.push(item.id);
-        newTextBoxes[item.id] = tb;
-      } else if (sep) {
-        newSeparators.push(sep);
-      }
+      newOrder.push(item.id);
     });
 
     appStore.setCurrentFile({
       name: currentFile.name,
       order: newOrder,
       heights: currentFile.heights,
-      text_boxes: newTextBoxes,
-      separators: newSeparators,
+      text_boxes: currentFile.text_boxes,
+      separators: currentFile.separators,
     });
   }
 
@@ -152,12 +123,6 @@
     if (!currentFile) return "";
 
     let result = "";
-    let separatorMap = new Map();
-
-    currentFile.separators.forEach((sep, index) => {
-      separatorMap.set(index, sep.content);
-    });
-
     let shadowVars = new Map();
 
     Object.values(currentFile.text_boxes).forEach((tb) => {
@@ -174,10 +139,6 @@
       if (!tb || tb.mode === "disabled") return;
 
       if (index > 0) {
-        const sepIndex = index - 1;
-        if (separatorMap.has(sepIndex)) {
-          lastSeparator = separatorMap.get(sepIndex);
-        }
         result += lastSeparator;
       }
 
@@ -231,9 +192,7 @@
             on:click={() => handleOutlineClick(item.id)}
           >
             <span class="mr-2 text-gray-400">☰</span>
-            <span class="mr-2">
-              {item.type === "textbox" ? "📝" : "🔀"}
-            </span>
+            <span class="mr-2">📝</span>
             <span class="text-gray-300 text-sm truncate flex-1">
               {item.title}
             </span>

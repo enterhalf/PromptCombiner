@@ -5,17 +5,17 @@ export interface TextBox {
   mode: "normal" | "disabled" | "shadow";
 }
 
-export interface Separator {
-  id: string;
-  content: string;
-}
-
 export interface PromptFile {
   name: string;
   order: string[];
   heights: Record<string, number>;
   text_boxes: Record<string, TextBox>;
   separators: Separator[];
+}
+
+export interface Separator {
+  id: string;
+  content: string;
 }
 
 export interface WorkspaceItem {
