@@ -13,15 +13,13 @@
   let startY = 0;
   let startHeight = 0;
   let isResizing = false;
-  let slideOffset = 0;
-  let isSliding = false;
-  let startX = 0;
-  let slideContainerWidth = 0;
-  let variantWidth = 0;
-  let slideContainer: HTMLElement;
   let titleInput: HTMLInputElement;
   let isTitleFocused = false;
   let isEditingTitle = false;
+
+  // 变体拖动排序相关
+  let draggedVariantIndex: number | null = null;
+  let dragOverVariantIndex: number | null = null;
 
   $: height = variantData.height;
   $: currentVariantIndex = variantData.current_variant_index;
@@ -30,7 +28,19 @@
   $: currentVariant = variantList[currentVariantIndex] || { content: "", title: "" };
   $: currentContent = currentVariant.content;
   $: currentTitle = currentVariant.title;
-  $: hasCustomTitle = currentTitle.trim().length > 0;
+
+  // 获取显示的标题（如果没有保存的标题，则从内容生成预览）
+  function getDisplayTitle(variant: Variant): string {
+    if (variant.title && variant.title.trim()) {
+      return variant.title.trim();
+    }
+    // 从内容生成预览标题
+    const trimmed = variant.content.trim();
+    if (trimmed.length > 0) {
+      return trimmed.substring(0, Math.min(12, trimmed.length));
+    }
+    return "Untitled";
+  }
 
   function handleDragHandleMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
@@ -85,13 +95,7 @@
 
   function handleTitleBlur(e: Event) {
     isTitleFocused = false;
-    const input = e.target as HTMLInputElement;
-    if (!input.value.trim()) {
-      isEditingTitle = false;
-      updateVariantTitle(currentVariantIndex, generateAutoTitle(currentContent));
-    } else {
-      isEditingTitle = false;
-    }
+    isEditingTitle = false;
   }
 
   function handleTitleClick() {
@@ -124,9 +128,6 @@
   function handleContentChange(e: Event) {
     const textarea = e.target as HTMLTextAreaElement;
     updateVariantContent(currentVariantIndex, textarea.value);
-    if (!isTitleFocused && !hasCustomTitle) {
-      updateVariantTitle(currentVariantIndex, generateAutoTitle(textarea.value));
-    }
   }
 
   function handleInput(e: Event) {
@@ -139,22 +140,6 @@
       const textarea = e.target as HTMLTextAreaElement;
       updateVariantContent(vIndex, textarea.value);
     };
-  }
-
-  function handlePrevVariantMouseDown(e: MouseEvent) {
-    e.stopPropagation();
-  }
-
-  function handleNextVariantMouseDown(e: MouseEvent) {
-    e.stopPropagation();
-  }
-
-  function generateAutoTitle(content: string): string {
-    const trimmed = content.trim();
-    if (trimmed.length > 0) {
-      return trimmed.substring(0, Math.min(20, trimmed.length));
-    }
-    return "Untitled";
   }
 
   function updateVariantContent(variantIndex: number, content: string) {
@@ -205,9 +190,10 @@
   }
 
   function handleAddVariant() {
+    // 复制当前变体的内容和标题
     const newVariant: Variant = {
       content: currentContent,
-      title: generateAutoTitle(currentContent),
+      title: currentTitle || "", // 复制当前标题（可能是空的）
     };
     const newVariants = [...(variantData.variants || []), newVariant];
     dispatch("variantschange", {
@@ -220,55 +206,79 @@
     });
   }
 
-  function handlePrevVariant() {
-    if (currentVariantIndex > 0) {
-      dispatch("variantschange", {
-        id: textBox.id,
-        variantData: {
-          ...variantData,
-          current_variant_index: currentVariantIndex - 1,
-        },
-      });
+  // 切换到指定变体
+  function handleSwitchVariant(index: number) {
+    dispatch("variantschange", {
+      id: textBox.id,
+      variantData: {
+        ...variantData,
+        current_variant_index: index,
+      },
+    });
+  }
+
+  // 变体拖动排序 - 开始拖动
+  function handleVariantDragStart(e: DragEvent, index: number) {
+    draggedVariantIndex = index;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(index));
     }
   }
 
-  function handleNextVariant() {
-    if (currentVariantIndex < totalVariants - 1) {
-      dispatch("variantschange", {
-        id: textBox.id,
-        variantData: {
-          ...variantData,
-          current_variant_index: currentVariantIndex + 1,
-        },
-      });
-    }
-  }
-
-  function handleSlideStart(e: MouseEvent) {
-    if (e.button !== 0) return;
-    isSliding = true;
-    startX = e.clientX;
+  // 变体拖动排序 - 拖动经过
+  function handleVariantDragOver(e: DragEvent, index: number) {
     e.preventDefault();
-  }
-
-  function handleSlideMove(e: MouseEvent) {
-    if (!isSliding) return;
-    const diff = e.clientX - startX;
-    const maxOffset = slideContainerWidth - variantWidth;
-    slideOffset = Math.max(-maxOffset, Math.min(maxOffset, diff));
-  }
-
-  function handleSlideEnd() {
-    if (!isSliding) return;
-    isSliding = false;
-    const threshold = variantWidth / 3;
-
-    if (slideOffset > threshold) {
-      handlePrevVariant();
-    } else if (slideOffset < -threshold) {
-      handleNextVariant();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
     }
-    slideOffset = 0;
+    dragOverVariantIndex = index;
+  }
+
+  // 变体拖动排序 - 放置
+  function handleVariantDrop(e: DragEvent, dropIndex: number) {
+    e.preventDefault();
+    if (draggedVariantIndex === null || draggedVariantIndex === dropIndex) {
+      draggedVariantIndex = null;
+      dragOverVariantIndex = null;
+      return;
+    }
+
+    // 重新排序变体
+    const newVariants = [...(variantData.variants || [])];
+    const [movedVariant] = newVariants.splice(draggedVariantIndex, 1);
+    newVariants.splice(dropIndex, 0, movedVariant);
+
+    // 更新当前选中的变体索引
+    let newCurrentIndex = currentVariantIndex;
+    if (draggedVariantIndex === currentVariantIndex) {
+      // 如果移动的是当前选中的变体
+      newCurrentIndex = dropIndex;
+    } else if (draggedVariantIndex < currentVariantIndex && dropIndex >= currentVariantIndex) {
+      // 如果从前方向后移动，且经过当前选中的变体
+      newCurrentIndex = currentVariantIndex - 1;
+    } else if (draggedVariantIndex > currentVariantIndex && dropIndex <= currentVariantIndex) {
+      // 如果从后方向前移动，且经过当前选中的变体
+      newCurrentIndex = currentVariantIndex + 1;
+    }
+
+    dispatch("variantschange", {
+      id: textBox.id,
+      variantData: {
+        ...variantData,
+        variants: newVariants,
+        current_variant_index: newCurrentIndex,
+      },
+    });
+
+    draggedVariantIndex = null;
+    dragOverVariantIndex = null;
+  }
+
+  // 变体拖动排序 - 拖动结束
+  function handleVariantDragEnd() {
+    draggedVariantIndex = null;
+    dragOverVariantIndex = null;
   }
 
   $: modeColor =
@@ -288,71 +298,103 @@
   on:dragstart={handleDragStart}
   on:dragend={handleDragEnd}
 >
-  <div class="flex items-center px-3 py-2 {modeColor} border-b border-gray-600">
-    <div
-      class="mr-2 cursor-move text-gray-400 hover:text-gray-300"
-      on:mousedown={handleDragHandleMouseDown}
-      title="Drag to reorder"
-    >
-      ☰
-    </div>
-    <div class="flex-1 relative mr-2">
-      {#if !isEditingTitle}
-        <div
-          class="font-medium truncate px-1 rounded cursor-pointer hover:bg-gray-700 {hasCustomTitle
-            ? 'text-white'
-            : 'text-gray-500'}"
-          on:click={handleTitleClick}
-          title="Click to edit title"
-        >
-          {currentTitle || "Untitled"}
-        </div>
-      {:else}
-        <input
-          type="text"
-          bind:this={titleInput}
-          value={currentTitle}
-          on:input={handleTitleInput}
-          on:focus={handleTitleFocus}
-          on:blur={handleTitleBlur}
-          on:keydown={handleTitleKeyDown}
-          class="w-full bg-transparent font-medium truncate focus:outline-none focus:bg-gray-700 rounded px-1 text-white"
-          placeholder="Untitled"
-        />
-      {/if}
+  <!-- 标题栏 - 三栏布局 -->
+  <div class="flex items-center px-3 py-2 {modeColor} border-b border-gray-600 gap-2">
+    <!-- 左侧：拖动句柄和标题 -->
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <div
+        class="cursor-move text-gray-400 hover:text-gray-300"
+        on:mousedown={handleDragHandleMouseDown}
+        title="Drag to reorder"
+      >
+        ☰
+      </div>
+      <div class="relative w-24">
+        {#if !isEditingTitle}
+          <div
+            class="font-medium truncate px-1 rounded cursor-pointer hover:bg-gray-700 text-sm {currentTitle?.trim()
+              ? 'text-white'
+              : 'text-gray-400 italic'}"
+            on:click={handleTitleClick}
+            title="Click to edit title"
+          >
+            {getDisplayTitle(currentVariant)}
+          </div>
+        {:else}
+          <input
+            type="text"
+            bind:this={titleInput}
+            value={currentTitle}
+            on:input={handleTitleInput}
+            on:focus={handleTitleFocus}
+            on:blur={handleTitleBlur}
+            on:keydown={handleTitleKeyDown}
+            class="w-full bg-transparent font-medium truncate focus:outline-none focus:bg-gray-700 rounded px-1 text-white text-sm"
+            placeholder="Enter title..."
+          />
+        {/if}
+      </div>
     </div>
 
-    <select
-      value={textBox.mode}
-      on:change={handleModeChange}
-      class="bg-gray-700 text-white text-sm px-2 py-1 rounded mr-2 border border-gray-600"
-    >
-      <option value="normal">Normal</option>
-      <option value="disabled">Disabled</option>
-      <option value="shadow">Shadow</option>
-    </select>
+    <!-- 中间：变体切换按钮列表 -->
+    <div class="flex-1 min-w-0">
+      <div class="flex flex-wrap gap-1 justify-center">
+        {#each variantList as variant, vIndex}
+          <button
+            draggable="true"
+            on:click={() => handleSwitchVariant(vIndex)}
+            on:dragstart={(e) => handleVariantDragStart(e, vIndex)}
+            on:dragover={(e) => handleVariantDragOver(e, vIndex)}
+            on:drop={(e) => handleVariantDrop(e, vIndex)}
+            on:dragend={handleVariantDragEnd}
+            class="px-2 py-1 text-xs rounded border transition-all duration-150 cursor-pointer select-none max-w-[80px] truncate
+              {vIndex === currentVariantIndex 
+                ? 'bg-blue-600 border-blue-500 text-white' 
+                : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'}
+              {dragOverVariantIndex === vIndex && draggedVariantIndex !== vIndex ? 'ring-2 ring-yellow-400' : ''}
+              {draggedVariantIndex === vIndex ? 'opacity-50' : ''}"
+            title="{getDisplayTitle(variant)} - Drag to reorder, click to switch"
+          >
+            {getDisplayTitle(variant)}
+          </button>
+        {/each}
+      </div>
+    </div>
 
-    <button
-      on:click={handleDeleteVariant}
-      class="text-orange-400 hover:text-orange-300 px-2 py-1 rounded hover:bg-orange-900/30 mr-1"
-      title="Delete Variant"
-    >
-      🗑
-    </button>
-    <button
-      on:click={handleAddVariant}
-      class="text-green-400 hover:text-green-300 px-2 py-1 rounded hover:bg-green-900/30 mr-1"
-      title="Add Variant"
-    >
-      ➕
-    </button>
-    <button
-      on:click={handleDelete}
-      class="text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-900/30"
-      title="Delete"
-    >
-      ×
-    </button>
+    <!-- 右侧：操作按钮 -->
+    <div class="flex items-center gap-1 flex-shrink-0">
+      <select
+        value={textBox.mode}
+        on:change={handleModeChange}
+        class="bg-gray-700 text-white text-xs px-2 py-1 rounded border border-gray-600"
+      >
+        <option value="normal">Normal</option>
+        <option value="disabled">Disabled</option>
+        <option value="shadow">Shadow</option>
+      </select>
+
+      <button
+        on:click={handleDeleteVariant}
+        class="text-orange-400 hover:text-orange-300 px-2 py-1 rounded hover:bg-orange-900/30 text-xs"
+        title="Delete Variant"
+      >
+        🗑
+      </button>
+      <button
+        on:click={handleAddVariant}
+        class="text-green-400 hover:text-green-300 px-2 py-1 rounded hover:bg-green-900/30 text-xs"
+        title="Add Variant"
+      >
+        ➕
+      </button>
+      <button
+        on:click={handleDelete}
+        class="text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-900/30 text-xs"
+        title="Delete"
+      >
+        ×
+      </button>
+    </div>
   </div>
 
   <div class="flex-1 relative overflow-hidden">
@@ -360,7 +402,6 @@
       class="absolute inset-0 flex"
       style="transform: translateX(-{currentVariantIndex *
         100}%); transition: transform 0.3s ease;"
-      bind:this={slideContainer}
     >
       {#each variantList as variant, vIndex}
         <div class="flex-shrink-0 w-full h-full" style="width: 100%;">
@@ -376,28 +417,6 @@
     </div>
 
     {#if totalVariants > 1}
-      <button
-        on:click={handlePrevVariant}
-        on:mousedown={handlePrevVariantMouseDown}
-        class="absolute left-2 top-1/2 -translate-y-1/2 bg-gray-700 hover:bg-gray-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg z-10 {currentVariantIndex ===
-        0
-          ? 'opacity-30 cursor-not-allowed'
-          : ''}"
-        disabled={currentVariantIndex === 0}
-      >
-        ◀
-      </button>
-      <button
-        on:click={handleNextVariant}
-        on:mousedown={handleNextVariantMouseDown}
-        class="absolute right-2 top-1/2 -translate-y-1/2 bg-gray-700 hover:bg-gray-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg z-10 {currentVariantIndex ===
-        totalVariants - 1
-          ? 'opacity-30 cursor-not-allowed'
-          : ''}"
-        disabled={currentVariantIndex === totalVariants - 1}
-      >
-        ▶
-      </button>
       <div
         class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded"
       >
