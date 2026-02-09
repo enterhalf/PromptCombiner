@@ -4,7 +4,7 @@
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
   import Workbench from "./components/Workbench.svelte";
-  import type { TextBox as TextBoxType } from "./types";
+  import type { TextBox as TextBoxType, Variant } from "./types";
 
   let draggingIndex: number | null = null;
 
@@ -21,9 +21,12 @@
     const newId = generateId();
     const newTextBox: TextBoxType = {
       id: newId,
-      title: "Untitled",
-      content: "",
       mode: "normal",
+    };
+
+    const defaultVariant: Variant = {
+      content: "",
+      title: "Untitled",
     };
 
     appStore.setCurrentFile({
@@ -35,7 +38,7 @@
         [newId]: {
           height: 150,
           current_variant_index: 0,
-          variant_data: [""],
+          variants: [defaultVariant],
         },
       },
       separators: currentFile.separators,
@@ -175,14 +178,14 @@
 
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
-        const varName = tb.title.trim().toLowerCase().replace(" ", "_");
         const variantData = currentFile.variants[tb.id];
         const currentVariantIndex = variantData?.current_variant_index || 0;
-        let content = "";
-        if (variantData?.variant_data) {
-          content = variantData.variant_data[currentVariantIndex] || "";
+        const currentVariant = variantData?.variants?.[currentVariantIndex];
+        const varName = currentVariant?.title.trim().toLowerCase().replace(" ", "_") || "";
+        const content = currentVariant?.content || "";
+        if (varName) {
+          shadowVars.set(varName, content);
         }
-        shadowVars.set(varName, content);
       }
     });
 
@@ -198,10 +201,7 @@
 
       const variantData = currentFile.variants[textBoxId];
       const currentVariantIndex = variantData?.current_variant_index || 0;
-      let content = "";
-      if (variantData?.variant_data) {
-        content = variantData.variant_data[currentVariantIndex] || "";
-      }
+      let content = variantData?.variants?.[currentVariantIndex]?.content || "";
 
       shadowVars.forEach((value, key) => {
         const placeholder = `{{${key}}}`;

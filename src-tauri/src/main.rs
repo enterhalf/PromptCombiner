@@ -6,27 +6,26 @@ use tauri::command;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TextBox {
     pub id: String,
-    pub title: String,
-    pub content: String,
     pub mode: String,
-    #[serde(default)]
-    pub current_variant_index: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Separator {
-    pub id: String,
+pub struct Variant {
     pub content: String,
+    pub title: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VariantData {
     pub height: u32,
     pub current_variant_index: usize,
-    #[serde(default)]
-    pub variant_data: Vec<String>,
-    #[serde(default)]
-    pub titles: Option<Vec<String>>,
+    pub variants: Vec<Variant>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Separator {
+    pub id: String,
+    pub content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -191,10 +190,15 @@ fn generate_context(prompt_file: PromptFile) -> Result<String, String> {
 
     let mut shadow_vars = std::collections::HashMap::new();
 
-    for text_box in prompt_file.text_boxes.values() {
+    for (text_box_id, text_box) in &prompt_file.text_boxes {
         if text_box.mode == "shadow" {
-            let var_name = text_box.title.trim().to_lowercase().replace(' ', "_");
-            shadow_vars.insert(var_name, text_box.content.clone());
+            if let Some(variant_data) = prompt_file.variants.get(text_box_id) {
+                let current_index = variant_data.current_variant_index;
+                if let Some(variant) = variant_data.variants.get(current_index) {
+                    let var_name = variant.title.trim().to_lowercase().replace(' ', "_");
+                    shadow_vars.insert(var_name, variant.content.clone());
+                }
+            }
         }
     }
 
@@ -213,7 +217,13 @@ fn generate_context(prompt_file: PromptFile) -> Result<String, String> {
                 result.push_str(&last_separator);
             }
 
-            let mut content = text_box.content.clone();
+            let mut content = String::new();
+            if let Some(variant_data) = prompt_file.variants.get(text_box_id) {
+                let current_index = variant_data.current_variant_index;
+                if let Some(variant) = variant_data.variants.get(current_index) {
+                    content = variant.content.clone();
+                }
+            }
 
             for (key, value) in &shadow_vars {
                 let placeholder = format!("{{{{{}}}}}", key);

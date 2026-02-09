@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import type { TextBox, VariantData } from "../types";
+  import type { TextBox, VariantData, Variant } from "../types";
 
   export let textBox: TextBox;
   export let index: number;
@@ -21,14 +21,16 @@
   let slideContainer: HTMLElement;
   let titleInput: HTMLInputElement;
   let isTitleFocused = false;
-  let hasCustomTitle = false;
   let isEditingTitle = false;
 
   $: height = variantData.height;
   $: currentVariantIndex = variantData.current_variant_index;
-  $: variantList = variantData.variant_data || [];
+  $: variantList = variantData.variants || [];
   $: totalVariants = variantList.length;
-  $: currentContent = variantList[currentVariantIndex] || "";
+  $: currentVariant = variantList[currentVariantIndex] || { content: "", title: "" };
+  $: currentContent = currentVariant.content;
+  $: currentTitle = currentVariant.title;
+  $: hasCustomTitle = currentTitle.trim().length > 0;
 
   function handleDragHandleMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
@@ -74,9 +76,7 @@
 
   function handleTitleInput(e: Event) {
     const input = e.target as HTMLInputElement;
-    textBox.title = input.value;
-    hasCustomTitle = input.value.trim().length > 0;
-    dispatch("change", { textBox });
+    updateVariantTitle(currentVariantIndex, input.value);
   }
 
   function handleTitleFocus() {
@@ -87,10 +87,8 @@
     isTitleFocused = false;
     const input = e.target as HTMLInputElement;
     if (!input.value.trim()) {
-      hasCustomTitle = false;
       isEditingTitle = false;
-      updateTitle();
-      dispatch("change", { textBox });
+      updateVariantTitle(currentVariantIndex, generateAutoTitle(currentContent));
     } else {
       isEditingTitle = false;
     }
@@ -127,7 +125,7 @@
     const textarea = e.target as HTMLTextAreaElement;
     updateVariantContent(currentVariantIndex, textarea.value);
     if (!isTitleFocused && !hasCustomTitle) {
-      updateTitle();
+      updateVariantTitle(currentVariantIndex, generateAutoTitle(textarea.value));
     }
   }
 
@@ -151,28 +149,30 @@
     e.stopPropagation();
   }
 
-  function updateVariantContent(variantIndex: number, content: string) {
-    const newVariantData = [...(variantData.variant_data || [])];
-    newVariantData[variantIndex] = content;
-    dispatch("variantschange", {
-      id: textBox.id,
-      variantData: { ...variantData, variant_data: newVariantData },
-    });
-    updateTitle();
+  function generateAutoTitle(content: string): string {
+    const trimmed = content.trim();
+    if (trimmed.length > 0) {
+      return trimmed.substring(0, Math.min(20, trimmed.length));
+    }
+    return "Untitled";
   }
 
-  function updateTitle() {
-    const trimmed = currentContent.trim();
-    if (trimmed.length > 0) {
-      const autoTitle = trimmed.substring(0, Math.min(20, trimmed.length));
-      if (!hasCustomTitle) {
-        textBox.title = autoTitle;
-      }
-    } else {
-      if (!hasCustomTitle) {
-        textBox.title = "Untitled";
-      }
-    }
+  function updateVariantContent(variantIndex: number, content: string) {
+    const newVariants = [...(variantData.variants || [])];
+    newVariants[variantIndex] = { ...newVariants[variantIndex], content };
+    dispatch("variantschange", {
+      id: textBox.id,
+      variantData: { ...variantData, variants: newVariants },
+    });
+  }
+
+  function updateVariantTitle(variantIndex: number, title: string) {
+    const newVariants = [...(variantData.variants || [])];
+    newVariants[variantIndex] = { ...newVariants[variantIndex], title };
+    dispatch("variantschange", {
+      id: textBox.id,
+      variantData: { ...variantData, variants: newVariants },
+    });
   }
 
   function handleDelete() {
@@ -186,8 +186,8 @@
     }
 
     if (confirm("Delete this variant?")) {
-      const newVariantData = [...(variantData.variant_data || [])];
-      newVariantData.splice(currentVariantIndex, 1);
+      const newVariants = [...(variantData.variants || [])];
+      newVariants.splice(currentVariantIndex, 1);
       const newTotalVariants = totalVariants - 1;
       let newIndex = currentVariantIndex;
       if (currentVariantIndex >= newTotalVariants) {
@@ -197,7 +197,7 @@
         id: textBox.id,
         variantData: {
           ...variantData,
-          variant_data: newVariantData,
+          variants: newVariants,
           current_variant_index: newIndex,
         },
       });
@@ -205,16 +205,17 @@
   }
 
   function handleAddVariant() {
-    const newVariantData = [
-      ...(variantData.variant_data || []),
-      currentContent,
-    ];
+    const newVariant: Variant = {
+      content: currentContent,
+      title: generateAutoTitle(currentContent),
+    };
+    const newVariants = [...(variantData.variants || []), newVariant];
     dispatch("variantschange", {
       id: textBox.id,
       variantData: {
         ...variantData,
-        variant_data: newVariantData,
-        current_variant_index: newVariantData.length - 1,
+        variants: newVariants,
+        current_variant_index: newVariants.length - 1,
       },
     });
   }
@@ -304,13 +305,13 @@
           on:click={handleTitleClick}
           title="Click to edit title"
         >
-          {textBox.title || "Untitled"}
+          {currentTitle || "Untitled"}
         </div>
       {:else}
         <input
           type="text"
           bind:this={titleInput}
-          value={textBox.title}
+          value={currentTitle}
           on:input={handleTitleInput}
           on:focus={handleTitleFocus}
           on:blur={handleTitleBlur}
@@ -364,7 +365,7 @@
       {#each variantList as variant, vIndex}
         <div class="flex-shrink-0 w-full h-full" style="width: 100%;">
           <textarea
-            value={variant}
+            value={variant.content}
             on:input={handleVariantInput(vIndex)}
             on:blur={handleContentChange}
             class="w-full h-full bg-gray-900 text-white p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"

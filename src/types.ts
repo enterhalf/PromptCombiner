@@ -1,15 +1,17 @@
 export interface TextBox {
   id: string;
-  title: string;
-  content: string;
   mode: "normal" | "disabled" | "shadow";
+}
+
+export interface Variant {
+  content: string;
+  title: string;
 }
 
 export interface VariantData {
   height: number;
+  variants: Variant[];
   current_variant_index: number;
-  variant_data: string[];
-  titles?: string[];
 }
 
 export interface PromptFile {
