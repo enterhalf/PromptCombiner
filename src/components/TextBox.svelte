@@ -9,7 +9,6 @@
   const dispatch = createEventDispatcher();
 
   let isDragging = false;
-  let isDragHandle = false;
   let startY = 0;
   let startHeight = 0;
   let isResizing = false;
@@ -42,24 +41,16 @@
     return "Untitled";
   }
 
-  function handleDragHandleMouseDown(e: MouseEvent) {
-    if (e.button !== 0) return;
-    isDragHandle = true;
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
   function handleDragStart(e: DragEvent) {
-    if (!isDragHandle) {
-      e.preventDefault();
-      return;
-    }
     isDragging = true;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+    }
+    dispatch("dragstart");
   }
 
   function handleDragEnd() {
     isDragging = false;
-    isDragHandle = false;
     dispatch("dragend");
   }
 
@@ -219,6 +210,7 @@
 
   // 变体拖动排序 - 开始拖动
   function handleVariantDragStart(e: DragEvent, index: number) {
+    e.stopPropagation();
     draggedVariantIndex = index;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
@@ -229,6 +221,7 @@
   // 变体拖动排序 - 拖动经过
   function handleVariantDragOver(e: DragEvent, index: number) {
     e.preventDefault();
+    e.stopPropagation();
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "move";
     }
@@ -238,6 +231,7 @@
   // 变体拖动排序 - 放置
   function handleVariantDrop(e: DragEvent, dropIndex: number) {
     e.preventDefault();
+    e.stopPropagation();
     if (draggedVariantIndex === null || draggedVariantIndex === dropIndex) {
       draggedVariantIndex = null;
       dragOverVariantIndex = null;
@@ -276,7 +270,8 @@
   }
 
   // 变体拖动排序 - 拖动结束
-  function handleVariantDragEnd() {
+  function handleVariantDragEnd(e: DragEvent) {
+    e.stopPropagation();
     draggedVariantIndex = null;
     dragOverVariantIndex = null;
   }
@@ -292,19 +287,18 @@
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
 
 <div
-  class="flex flex-col bg-gray-800 rounded-lg mb-2 overflow-hidden relative"
+  class="flex flex-col bg-gray-800 rounded-lg mb-2 overflow-hidden relative {isDragging ? 'opacity-50' : ''}"
   style="height: {height}px;"
-  draggable="true"
-  on:dragstart={handleDragStart}
-  on:dragend={handleDragEnd}
 >
   <!-- 标题栏 - 三栏布局 -->
   <div class="flex items-center px-3 py-2 {modeColor} border-b border-gray-600 gap-2">
     <!-- 左侧：拖动句柄和标题 -->
     <div class="flex items-center gap-2 flex-shrink-0">
       <div
-        class="cursor-move text-gray-400 hover:text-gray-300"
-        on:mousedown={handleDragHandleMouseDown}
+        class="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-300 select-none"
+        draggable="true"
+        on:dragstart={handleDragStart}
+        on:dragend={handleDragEnd}
         title="Drag to reorder"
       >
         ☰
@@ -339,24 +333,27 @@
     <!-- 中间：变体切换按钮列表 -->
     <div class="flex-1 min-w-0">
       <div class="flex flex-wrap gap-1 justify-center">
-        {#each variantList as variant, vIndex}
-          <button
+        {#each variantList as variant, vIndex (vIndex)}
+          <div
             draggable="true"
+            role="button"
+            tabindex="0"
             on:click={() => handleSwitchVariant(vIndex)}
+            on:keydown={(e) => e.key === 'Enter' && handleSwitchVariant(vIndex)}
             on:dragstart={(e) => handleVariantDragStart(e, vIndex)}
             on:dragover={(e) => handleVariantDragOver(e, vIndex)}
             on:drop={(e) => handleVariantDrop(e, vIndex)}
-            on:dragend={handleVariantDragEnd}
-            class="px-2 py-1 text-xs rounded border transition-all duration-150 cursor-pointer select-none max-w-[80px] truncate
-              {vIndex === currentVariantIndex 
-                ? 'bg-blue-600 border-blue-500 text-white' 
+            on:dragend={(e) => handleVariantDragEnd(e)}
+            class="px-2 py-1 text-xs rounded border transition-all duration-150 cursor-grab active:cursor-grabbing select-none max-w-[80px] truncate
+              {vIndex === currentVariantIndex
+                ? 'bg-blue-600 border-blue-500 text-white'
                 : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'}
               {dragOverVariantIndex === vIndex && draggedVariantIndex !== vIndex ? 'ring-2 ring-yellow-400' : ''}
               {draggedVariantIndex === vIndex ? 'opacity-50' : ''}"
             title="{getDisplayTitle(variant)} - Drag to reorder, click to switch"
           >
             {getDisplayTitle(variant)}
-          </button>
+          </div>
         {/each}
       </div>
     </div>

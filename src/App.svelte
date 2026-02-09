@@ -109,27 +109,22 @@
     });
   }
 
-  function handleTextBoxDragEnd() {
-    if (!currentFile) return;
-    appStore.setCurrentFile({
-      name: currentFile.name,
-      order: currentFile.order,
-      text_boxes: currentFile.text_boxes,
-      variants: currentFile.variants,
-      separators: currentFile.separators,
-    });
-  }
-
   function handleDragStart(index: number) {
     draggingIndex = index;
   }
 
-  function handleDragOver(e: any) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+  function handleDragEnd() {
+    draggingIndex = null;
   }
 
-  function handleDrop(e: any, index: number) {
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+  }
+
+  function handleDrop(e: DragEvent, index: number) {
     e.preventDefault();
     if (!currentFile) return;
     if (draggingIndex !== null && draggingIndex !== index) {
@@ -238,7 +233,12 @@
             {@const textBox = currentFile.text_boxes[textBoxId]}
             {@const variantData = currentFile.variants[textBoxId]}
             {#if textBox && variantData}
-              <div id={textBox.id}>
+              <div
+                id={textBox.id}
+                draggable="true"
+                on:dragover={handleDragOver}
+                on:drop={(e) => handleDrop(e, index)}
+              >
                 <TextBox
                   {textBox}
                   {index}
@@ -246,11 +246,9 @@
                   on:change={handleTextBoxChange}
                   on:heightchange={handleHeightChange}
                   on:delete={handleTextBoxDelete}
-                  on:dragend={handleTextBoxDragEnd}
-                  on:variantschange={handleVariantsChange}
                   on:dragstart={() => handleDragStart(index)}
-                  on:dragover={handleDragOver}
-                  on:drop={(e) => handleDrop(e, index)}
+                  on:dragend={handleDragEnd}
+                  on:variantschange={handleVariantsChange}
                 />
               </div>
             {/if}

@@ -16,7 +16,7 @@
   }
 
   function updateOutline() {
-    outlineItems = [];
+    const newItems = [];
     currentFile.order.forEach((textBoxId, index) => {
       const tb = currentFile.text_boxes[textBoxId];
       if (tb) {
@@ -27,13 +27,14 @@
           currentVariant?.title ||
           currentVariant?.content?.substring(0, 20) ||
           `Text Box ${index + 1}`;
-        outlineItems.push({
+        newItems.push({
           id: tb.id,
           title: title,
           type: "textbox",
         });
       }
     });
+    outlineItems = newItems;
   }
 
   function handleGenerate() {
@@ -58,20 +59,28 @@
     }
   }
 
-  function handleDragStart(index: number) {
+  function handleDragStart(e: DragEvent, index: number) {
     draggingItem = index;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(index));
+    }
   }
 
-  function handleDragOver(e: any, index: number) {
+  function handleDragOver(e: DragEvent, index: number) {
     e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
   }
 
-  function handleDrop(e: any, index: number) {
+  function handleDrop(e: DragEvent, index: number) {
     e.preventDefault();
     if (draggingItem !== null && draggingItem !== index) {
-      const item = outlineItems[draggingItem];
-      outlineItems.splice(draggingItem, 1);
-      outlineItems.splice(index, 0, item);
+      const newItems = [...outlineItems];
+      const [movedItem] = newItems.splice(draggingItem, 1);
+      newItems.splice(index, 0, movedItem);
+      outlineItems = newItems;
 
       reorderItems();
     }
@@ -112,7 +121,8 @@
         const variantData = currentFile.variants[tb.id];
         const currentVariantIndex = variantData?.current_variant_index || 0;
         const currentVariant = variantData?.variants?.[currentVariantIndex];
-        const varName = currentVariant?.title.trim().toLowerCase().replace(" ", "_") || "";
+        const varName =
+          currentVariant?.title.trim().toLowerCase().replace(" ", "_") || "";
         const content = currentVariant?.content || "";
         if (varName) {
           shadowVars.set(varName, content);
@@ -165,18 +175,20 @@
   <div class="flex-1 overflow-y-auto pr-2">
     <h3 class="text-white font-bold mb-2">Outline</h3>
     <div class="space-y-1">
-      {#each outlineItems as item, index}
+      {#each outlineItems as item, index (item.id)}
         <div
           draggable="true"
-          on:dragstart={() => handleDragStart(index)}
+          on:dragstart={(e) => handleDragStart(e, index)}
           on:dragover={(e) => handleDragOver(e, index)}
           on:drop={(e) => handleDrop(e, index)}
-          class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move"
-          on:click={() => handleOutlineClick(item.id)}
+          class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move select-none"
         >
-          <span class="mr-2 text-gray-400">☰</span>
+          <span class="mr-2 text-gray-400 cursor-grab active:cursor-grabbing">☰</span>
           <span class="mr-2">📝</span>
-          <span class="text-gray-300 text-sm truncate flex-1">
+          <span
+            class="text-gray-300 text-sm truncate flex-1 cursor-pointer"
+            on:click={() => handleOutlineClick(item.id)}
+          >
             {item.title}
           </span>
         </div>
