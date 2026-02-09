@@ -20,8 +20,15 @@
     currentFile.order.forEach((textBoxId, index) => {
       const tb = currentFile.text_boxes[textBoxId];
       if (tb) {
+        const variantData = currentFile.variants[textBoxId];
+        const currentContent =
+          variantData?.variant_data?.[
+            variantData?.current_variant_index || 0
+          ] || "";
         const title =
-          tb.title || tb.content.substring(0, 20) || `Text Box ${index + 1}`;
+          tb.title ||
+          currentContent.substring(0, 20) ||
+          `Text Box ${index + 1}`;
         outlineItems.push({
           id: tb.id,
           title: title,
@@ -107,10 +114,9 @@
         const varName = tb.title.trim().toLowerCase().replace(" ", "_");
         const variantData = currentFile.variants[tb.id];
         const currentVariantIndex = variantData?.current_variant_index || 0;
-        let content = tb.content;
-        if (currentVariantIndex > 0 && variantData?.variant_data) {
-          content =
-            variantData.variant_data[currentVariantIndex - 1] || content;
+        let content = "";
+        if (variantData?.variant_data) {
+          content = variantData.variant_data[currentVariantIndex] || "";
         }
         shadowVars.set(varName, content);
       }
@@ -128,9 +134,9 @@
 
       const variantData = currentFile.variants[textBoxId];
       const currentVariantIndex = variantData?.current_variant_index || 0;
-      let content = tb.content;
-      if (currentVariantIndex > 0 && variantData?.variant_data) {
-        content = variantData.variant_data[currentVariantIndex - 1] || content;
+      let content = "";
+      if (variantData?.variant_data) {
+        content = variantData.variant_data[currentVariantIndex] || "";
       }
 
       shadowVars.forEach((value, key) => {

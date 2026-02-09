@@ -35,7 +35,7 @@
         [newId]: {
           height: 150,
           current_variant_index: 0,
-          variant_data: [],
+          variant_data: [""],
         },
       },
       separators: currentFile.separators,
@@ -178,10 +178,9 @@
         const varName = tb.title.trim().toLowerCase().replace(" ", "_");
         const variantData = currentFile.variants[tb.id];
         const currentVariantIndex = variantData?.current_variant_index || 0;
-        let content = tb.content;
-        if (currentVariantIndex > 0 && variantData?.variant_data) {
-          content =
-            variantData.variant_data[currentVariantIndex - 1] || content;
+        let content = "";
+        if (variantData?.variant_data) {
+          content = variantData.variant_data[currentVariantIndex] || "";
         }
         shadowVars.set(varName, content);
       }
@@ -199,9 +198,9 @@
 
       const variantData = currentFile.variants[textBoxId];
       const currentVariantIndex = variantData?.current_variant_index || 0;
-      let content = tb.content;
-      if (currentVariantIndex > 0 && variantData?.variant_data) {
-        content = variantData.variant_data[currentVariantIndex - 1] || content;
+      let content = "";
+      if (variantData?.variant_data) {
+        content = variantData.variant_data[currentVariantIndex] || "";
       }
 
       shadowVars.forEach((value, key) => {

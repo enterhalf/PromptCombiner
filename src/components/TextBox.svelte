@@ -26,7 +26,7 @@
 
   $: height = variantData.height;
   $: currentVariantIndex = variantData.current_variant_index;
-  $: variantList = [textBox.content, ...(variantData.variant_data || [])];
+  $: variantList = variantData.variant_data || [];
   $: totalVariants = variantList.length;
   $: currentContent = variantList[currentVariantIndex] || "";
 
@@ -152,17 +152,12 @@
   }
 
   function updateVariantContent(variantIndex: number, content: string) {
-    if (variantIndex === 0) {
-      textBox.content = content;
-      dispatch("change", { textBox });
-    } else {
-      const newVariantData = [...(variantData.variant_data || [])];
-      newVariantData[variantIndex - 1] = content;
-      dispatch("variantschange", {
-        id: textBox.id,
-        variantData: { ...variantData, variant_data: newVariantData },
-      });
-    }
+    const newVariantData = [...(variantData.variant_data || [])];
+    newVariantData[variantIndex] = content;
+    dispatch("variantschange", {
+      id: textBox.id,
+      variantData: { ...variantData, variant_data: newVariantData },
+    });
     updateTitle();
   }
 
@@ -185,14 +180,14 @@
   }
 
   function handleDeleteVariant() {
-    if (currentVariantIndex === 0) {
-      alert("Cannot delete the main variant");
+    if (totalVariants <= 1) {
+      alert("Cannot delete the last variant");
       return;
     }
 
     if (confirm("Delete this variant?")) {
       const newVariantData = [...(variantData.variant_data || [])];
-      newVariantData.splice(currentVariantIndex - 1, 1);
+      newVariantData.splice(currentVariantIndex, 1);
       const newTotalVariants = totalVariants - 1;
       let newIndex = currentVariantIndex;
       if (currentVariantIndex >= newTotalVariants) {
@@ -219,7 +214,7 @@
       variantData: {
         ...variantData,
         variant_data: newVariantData,
-        current_variant_index: newVariantData.length,
+        current_variant_index: newVariantData.length - 1,
       },
     });
   }
