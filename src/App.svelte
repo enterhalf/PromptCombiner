@@ -126,6 +126,7 @@
 
   function handleDrop(e: DragEvent, index: number) {
     e.preventDefault();
+    e.stopPropagation();
     if (!currentFile) return;
     if (draggingIndex !== null && draggingIndex !== index) {
       const newOrder = [...currentFile.order];
@@ -233,11 +234,13 @@
             {@const textBox = currentFile.text_boxes[textBoxId]}
             {@const variantData = currentFile.variants[textBoxId]}
             {#if textBox && variantData}
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 id={textBox.id}
-                draggable="true"
+                role="listitem"
                 on:dragover={handleDragOver}
                 on:drop={(e) => handleDrop(e, index)}
+                class={draggingIndex === index ? 'opacity-50' : ''}
               >
                 <TextBox
                   {textBox}

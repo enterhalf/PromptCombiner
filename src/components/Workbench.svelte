@@ -4,38 +4,24 @@
 
   export let currentFile: PromptFile;
 
-  let outlineItems: Array<{
-    id: string;
-    title: string;
-    type: "textbox";
-  }> = [];
-  let draggingItem: number | null = null;
+  let draggingIndex: number | null = null;
 
-  $: if (currentFile) {
-    updateOutline();
-  }
-
-  function updateOutline() {
-    const newItems = [];
-    currentFile.order.forEach((textBoxId, index) => {
-      const tb = currentFile.text_boxes[textBoxId];
-      if (tb) {
-        const variantData = currentFile.variants[textBoxId];
-        const currentVariantIndex = variantData?.current_variant_index || 0;
-        const currentVariant = variantData?.variants?.[currentVariantIndex];
-        const title =
-          currentVariant?.title ||
-          currentVariant?.content?.substring(0, 20) ||
-          `Text Box ${index + 1}`;
-        newItems.push({
-          id: tb.id,
-          title: title,
-          type: "textbox",
-        });
-      }
-    });
-    outlineItems = newItems;
-  }
+  // 直接从 currentFile.order 获取大纲项，避免状态不同步
+  $: outlineItems = currentFile.order.map((textBoxId, index) => {
+    const tb = currentFile.text_boxes[textBoxId];
+    const variantData = currentFile.variants[textBoxId];
+    const currentVariantIndex = variantData?.current_variant_index || 0;
+    const currentVariant = variantData?.variants?.[currentVariantIndex];
+    const title =
+      currentVariant?.title ||
+      currentVariant?.content?.substring(0, 20) ||
+      `Text Box ${index + 1}`;
+    return {
+      id: tb?.id || textBoxId,
+      title: title,
+      type: "textbox" as const,
+    };
+  });
 
   function handleGenerate() {
     if (!currentFile) return;
@@ -60,7 +46,7 @@
   }
 
   function handleDragStart(e: DragEvent, index: number) {
-    draggingItem = index;
+    draggingIndex = index;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", String(index));
@@ -74,25 +60,19 @@
     }
   }
 
-  function handleDrop(e: DragEvent, index: number) {
+  function handleDrop(e: DragEvent, dropIndex: number) {
     e.preventDefault();
-    if (draggingItem !== null && draggingItem !== index) {
-      const newItems = [...outlineItems];
-      const [movedItem] = newItems.splice(draggingItem, 1);
-      newItems.splice(index, 0, movedItem);
-      outlineItems = newItems;
+    e.stopPropagation();
 
-      reorderItems();
+    if (draggingIndex === null || draggingIndex === dropIndex) {
+      draggingIndex = null;
+      return;
     }
-    draggingItem = null;
-  }
 
-  function reorderItems() {
-    const newOrder: string[] = [];
-
-    outlineItems.forEach((item) => {
-      newOrder.push(item.id);
-    });
+    // 直接更新 order 数组
+    const newOrder = [...currentFile.order];
+    const [movedItem] = newOrder.splice(draggingIndex, 1);
+    newOrder.splice(dropIndex, 0, movedItem);
 
     appStore.setCurrentFile({
       name: currentFile.name,
@@ -101,6 +81,12 @@
       variants: currentFile.variants,
       separators: currentFile.separators,
     });
+
+    draggingIndex = null;
+  }
+
+  function handleDragEnd() {
+    draggingIndex = null;
   }
 
   function handleOutlineClick(id: string) {
@@ -176,18 +162,30 @@
     <h3 class="text-white font-bold mb-2">Outline</h3>
     <div class="space-y-1">
       {#each outlineItems as item, index (item.id)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
           draggable="true"
+          role="listitem"
           on:dragstart={(e) => handleDragStart(e, index)}
           on:dragover={(e) => handleDragOver(e, index)}
           on:drop={(e) => handleDrop(e, index)}
-          class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move select-none"
+          on:dragend={handleDragEnd}
+          class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move select-none {draggingIndex ===
+          index
+            ? 'opacity-50'
+            : ''}"
         >
-          <span class="mr-2 text-gray-400 cursor-grab active:cursor-grabbing">☰</span>
+          <span class="mr-2 text-gray-400 cursor-grab active:cursor-grabbing"
+            >☰</span
+          >
           <span class="mr-2">📝</span>
           <span
             class="text-gray-300 text-sm truncate flex-1 cursor-pointer"
+            role="button"
+            tabindex="0"
             on:click={() => handleOutlineClick(item.id)}
+            on:keydown={(e) => e.key === "Enter" && handleOutlineClick(item.id)}
           >
             {item.title}
           </span>

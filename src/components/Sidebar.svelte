@@ -230,7 +230,10 @@
       {#each workspaceItems as item}
         <div
           class="flex items-center justify-between p-2 rounded hover:bg-gray-800 cursor-pointer mb-1 group"
+          role="button"
+          tabindex="0"
           on:click={() => handleOpenFile(item)}
+          on:keydown={(e) => e.key === 'Enter' && handleOpenFile(item)}
         >
           <div class="flex items-center flex-1 min-w-0">
             <span class="mr-2">

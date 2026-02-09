@@ -3,7 +3,7 @@
   import type { TextBox, VariantData, Variant } from "../types";
 
   export let textBox: TextBox;
-  export let index: number;
+  export let index: number | undefined = undefined;
   export let variantData: VariantData;
 
   const dispatch = createEventDispatcher();
@@ -45,11 +45,12 @@
     isDragging = true;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(index));
     }
     dispatch("dragstart");
   }
 
-  function handleDragEnd() {
+  function handleDragEnd(e: DragEvent) {
     isDragging = false;
     dispatch("dragend");
   }
@@ -297,8 +298,11 @@
       <div
         class="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-300 select-none"
         draggable="true"
+        role="button"
+        tabindex="0"
         on:dragstart={handleDragStart}
         on:dragend={handleDragEnd}
+        on:keydown={(e) => {}}
         title="Drag to reorder"
       >
         ☰
@@ -309,7 +313,10 @@
             class="font-medium truncate px-1 rounded cursor-pointer hover:bg-gray-700 text-sm {currentTitle?.trim()
               ? 'text-white'
               : 'text-gray-400 italic'}"
+            role="button"
+            tabindex="0"
             on:click={handleTitleClick}
+            on:keydown={(e) => e.key === 'Enter' && handleTitleClick()}
             title="Click to edit title"
           >
             {getDisplayTitle(currentVariant)}
@@ -334,6 +341,8 @@
     <div class="flex-1 min-w-0">
       <div class="flex flex-wrap gap-1 justify-center">
         {#each variantList as variant, vIndex (vIndex)}
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             draggable="true"
             role="button"
@@ -424,6 +433,8 @@
 
   <div
     class="h-2 bg-gray-700 hover:bg-gray-600 cursor-ns-resize flex items-center justify-center"
+    role="separator"
+    aria-orientation="horizontal"
     on:mousedown={handleResizeStart}
   >
     <div class="w-8 h-1 bg-gray-500 rounded"></div>
