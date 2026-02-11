@@ -4,11 +4,9 @@
   import { savePromptFile } from "./tauri-api";
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
-  import Workbench from "./components/Workbench.svelte";
-  import type { TextBox as TextBoxType, Variant } from "./types";
+  import type { TextBox as TextBoxType, Variant, BoxType } from "./types";
 
   $: currentFile = $appStore.currentFile;
-  $: activeTab = $appStore.activeTab;
 
   // 用于 dnd-zone 的列表
   $: textBoxList = currentFile
@@ -23,7 +21,8 @@
     return Math.random().toString(36).substr(2, 9);
   }
 
-  function addTextBox() {
+  // 在指定位置插入新文本框
+  function insertTextBoxAt(index: number) {
     if (!currentFile) return;
 
     const newId = generateId();
@@ -37,8 +36,12 @@
       title: "",
     };
 
+    // 在指定位置插入新id
+    const newOrder = [...currentFile.order];
+    newOrder.splice(index, 0, newId);
+
     appStore.setCurrentFile({
-      order: [...currentFile.order, newId],
+      order: newOrder,
       text_boxes: { ...currentFile.text_boxes, [newId]: newTextBox },
       variants: {
         ...currentFile.variants,
@@ -50,6 +53,16 @@
       },
       separators: currentFile.separators,
     });
+  }
+
+  // 在文本框之前插入
+  function insertBefore(index: number) {
+    insertTextBoxAt(index);
+  }
+
+  // 在文本框之后插入
+  function insertAfter(index: number) {
+    insertTextBoxAt(index + 1);
   }
 
   function handleTextBoxChange(e: CustomEvent) {
@@ -202,13 +215,7 @@
 </script>
 
 <div class="flex h-screen bg-gray-900">
-  <Sidebar>
-    <svelte:fragment slot="workbench">
-      {#if activeTab === "workbench" && currentFile}
-        <Workbench {currentFile} />
-      {/if}
-    </svelte:fragment>
-  </Sidebar>
+  <Sidebar />
 
   <div class="flex-1 flex flex-col h-full overflow-hidden">
     {#if currentFile}
@@ -220,6 +227,17 @@
 
       <div class="flex-1 overflow-y-auto p-4">
         <div class="max-w-4xl mx-auto min-h-full">
+          <!-- 第一个插入按钮（在第一个文本框之前） -->
+          <div class="flex justify-center py-1">
+            <button
+              on:click={() => insertBefore(0)}
+              class="px-2 py-0.5 bg-green-600/80 hover:bg-green-700 text-white rounded text-xs opacity-0 hover:opacity-100 transition-opacity"
+              title="Insert Text Box here"
+            >
+              + Text Box
+            </button>
+          </div>
+
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             use:dndzone={{
@@ -229,9 +247,9 @@
             }}
             on:consider={handleDndConsider}
             on:finalize={handleDndFinalize}
-            class="space-y-2"
+            class="space-y-1"
           >
-            {#each textBoxList as item (item.id)}
+            {#each textBoxList as item, index (item.id)}
               {@const textBox = item.textBox}
               {@const variantData = item.variantData}
               {#if textBox && variantData}
@@ -244,18 +262,19 @@
                     on:delete={handleTextBoxDelete}
                     on:variantschange={handleVariantsChange}
                   />
+                  <!-- 在每个文本框之后的插入按钮 -->
+                  <div class="flex justify-center py-1">
+                    <button
+                      on:click={() => insertAfter(index)}
+                      class="px-2 py-0.5 bg-green-600/80 hover:bg-green-700 text-white rounded text-xs opacity-0 hover:opacity-100 transition-opacity"
+                      title="Insert Text Box here"
+                    >
+                      + Text Box
+                    </button>
+                  </div>
                 </div>
               {/if}
             {/each}
-          </div>
-
-          <div class="flex gap-2 mt-4">
-            <button
-              on:click={addTextBox}
-              class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm"
-            >
-              + Text Box
-            </button>
           </div>
         </div>
       </div>

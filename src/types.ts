@@ -41,3 +41,6 @@ export interface AppState {
   generatedText: string;
   showGeneratedModal: boolean;
 }
+
+// 框体类型，为未来扩展预留
+export type BoxType = "text" | "file" | "image";

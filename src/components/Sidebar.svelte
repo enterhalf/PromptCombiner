@@ -10,6 +10,7 @@
   } from "../tauri-api";
   import { open } from "@tauri-apps/api/dialog";
   import type { WorkspaceItem } from "../types";
+  import Workbench from "./Workbench.svelte";
 
   let workspacePath = "";
   let workspaceItems: WorkspaceItem[] = [];
@@ -23,7 +24,12 @@
   let copyName = "";
   let isTauriEnv = typeof window !== "undefined" && "__TAURI__" in window;
 
-  $: activeTab = $appStore.activeTab;
+  // 高度调整相关
+  let filesHeight = 50; // 百分比
+  let isResizing = false;
+  let startY = 0;
+  let startHeight = 0;
+  let sidebarHeight = 0;
 
   async function loadWorkspace() {
     if (workspacePath) {
@@ -159,12 +165,37 @@
     }
   }
 
-  function handleTabClick(tab: "files" | "workbench") {
-    appStore.setActiveTab(tab);
+  function handleResizeStart(e: MouseEvent) {
+    if (e.button !== 0) return;
+    isResizing = true;
+    startY = e.clientY;
+    startHeight = filesHeight;
+    const sidebar = (e.target as HTMLElement).closest('.sidebar-container') as HTMLElement;
+    if (sidebar) {
+      sidebarHeight = sidebar.clientHeight;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleResizeMove(e: MouseEvent) {
+    if (!isResizing) return;
+    const diff = e.clientY - startY;
+    const diffPercent = (diff / sidebarHeight) * 100;
+    let newHeight = startHeight + diffPercent;
+    // 限制最小和最大高度
+    newHeight = Math.max(20, Math.min(80, newHeight));
+    filesHeight = newHeight;
+  }
+
+  function handleResizeEnd() {
+    isResizing = false;
   }
 </script>
 
-<div class="w-64 bg-gray-900 border-r border-gray-700 flex flex-col h-full">
+<svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
+
+<div class="w-64 bg-gray-900 border-r border-gray-700 flex flex-col h-full sidebar-container">
   <div class="p-4 border-b border-gray-700">
     <h1 class="text-white text-lg font-bold mb-3">Prompt Combiner</h1>
 
@@ -197,26 +228,42 @@
     {/if}
   </div>
 
-  <div class="flex border-b border-gray-700">
-    <button
-      on:click={() => handleTabClick("files")}
-      class="flex-1 py-2 text-sm font-medium {activeTab === 'files'
-        ? 'text-blue-400 border-b-2 border-blue-400'
-        : 'text-gray-400 hover:text-gray-300'}"
-    >
-      Files
-    </button>
-    <button
-      on:click={() => handleTabClick("workbench")}
-      class="flex-1 py-2 text-sm font-medium {activeTab === 'workbench'
-        ? 'text-blue-400 border-b-2 border-blue-400'
-        : 'text-gray-400 hover:text-gray-300'}"
-    >
-      Workbench
-    </button>
+  <!-- Workbench 区域 -->
+  <div
+    class="flex flex-col overflow-hidden"
+    style="height: {100 - filesHeight}%"
+  >
+    <div class="px-3 py-2 bg-gray-800 border-b border-gray-700">
+      <h2 class="text-white font-medium text-sm">Workbench</h2>
+    </div>
+    <div class="flex-1 overflow-hidden">
+      {#if $appStore.currentFile}
+        <Workbench currentFile={$appStore.currentFile} />
+      {:else}
+        <div class="flex items-center justify-center h-full text-gray-500 text-sm">
+          Open a file to see workbench
+        </div>
+      {/if}
+    </div>
   </div>
 
-  {#if activeTab === "files"}
+  <!-- 拖拽调整条 -->
+  <div
+    class="h-2 bg-gray-700 hover:bg-gray-600 cursor-ns-resize flex items-center justify-center border-y border-gray-600"
+    role="separator"
+    aria-orientation="horizontal"
+    on:mousedown={handleResizeStart}
+  >
+    <div class="w-8 h-1 bg-gray-500 rounded"></div>
+  </div>
+
+  <!-- Files 区域 -->
+  <div
+    class="flex-1 flex flex-col overflow-hidden"
+  >
+    <div class="px-3 py-2 bg-gray-800 border-b border-gray-700">
+      <h2 class="text-white font-medium text-sm">Files</h2>
+    </div>
     <div class="flex-1 overflow-y-auto p-2">
       {#if workspacePath}
         <button
@@ -271,9 +318,7 @@
         </div>
       {/each}
     </div>
-  {:else}
-    <slot name="workbench"></slot>
-  {/if}
+  </div>
 </div>
 
 {#if showNewFileDialog}
