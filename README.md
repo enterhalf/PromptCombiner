@@ -1,150 +1,230 @@
 # Prompt Combiner
 
-A cross-platform prompt management and combination tool built with Tauri, Svelte, and Rust.
+## 中文文档
 
-## Features
+### 🎯 简介
 
-### Main Interface
-- **Text Boxes**: Create and manage multiple text boxes with drag-and-drop reordering
-- **Resizable**: Drag the bottom edge of text boxes to adjust height
+Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你高效地组织、管理和生成 AI 提示词。
+
+### ✨ 主要功能
+
+- **多文本框管理**：创建多个文本框，支持拖拽排序
+- **三种模式**：
+  - **普通模式**：参与最终提示词生成
+  - **禁用模式**：不参与生成
+  - **影子模式**：不参与生成，但可作为变量使用（如 `{{变量名}}`）
+- **变体支持**：为每个文本框创建多个版本，方便切换
+- **自动保存**：编辑内容自动保存到本地
+- **撤销/重做**：支持 Ctrl+Z 撤销、Ctrl+Y 重做
+- **工作区管理**：选择工作目录，管理 `.prompt` 文件
+
+### 📥 下载安装
+
+我们提供预编译的安装包，支持 Windows、macOS 和 Linux 系统。
+
+1. 访问项目的 [Releases 页面](../../releases)
+2. 根据你的操作系统下载对应的安装包：
+   - **Windows**：下载 `.exe` 或 `.msi` 安装包
+   - **macOS**：下载 `.dmg` 镜像文件
+   - **Linux**：下载 `.AppImage` 或对应的 deb/rpm 包
+3. 运行安装程序，按照提示完成安装
+
+### 🚀 快速开始
+
+1. **选择工作区**：点击左侧边栏的"选择工作区"，选择你的工作目录
+2. **创建文件**：点击"+ 新建文件"创建一个新的 `.prompt` 文件
+3. **添加文本框**：点击"+ Text Box"添加文本框
+4. **编辑内容**：在文本框中输入你的提示词内容
+5. **设置模式**：通过下拉菜单设置文本框模式（普通/禁用/影子）
+6. **生成提示词**：点击"生成"或"生成并复制"按钮生成最终提示词
+
+### 💡 使用技巧
+
+- **拖拽排序**：直接拖拽文本框可以调整顺序
+- **调整高度**：拖拽文本框底部边缘可以调整高度
+- **使用变量**：将文本框设置为"影子模式"，在其他文本框中使用 `{{变量名}}` 引用
+- **创建变体**：点击文本框右侧的"+"按钮创建变体，方便对比不同版本
+
+### ⌨️ 快捷键
+
+- `Ctrl + Z`：撤销
+- `Ctrl + Y`：重做
+
+---
+
+<a name="english"></a>
+
+## English Documentation
+
+### 🎯 Introduction
+
+Prompt Combiner is a cross-platform prompt management and combination tool that helps you efficiently organize, manage, and generate AI prompts.
+
+### ✨ Features
+
+- **Multiple Text Boxes**: Create and manage multiple text boxes with drag-and-drop reordering
 - **Three Modes**:
-  - **Normal**: Participates in context generation
-  - **Disabled**: Excluded from context generation
-  - **Shadow**: Excluded from context but available as variables (e.g., `{{variable_name}}`)
-- **Variants**: Create multiple versions of text content with horizontal navigation
-- **Separators**: Define custom separators between text boxes (default: `\n\n`)
+  - **Normal**: Participates in final prompt generation
+  - **Disabled**: Excluded from generation
+  - **Shadow**: Excluded from generation but available as variables (e.g., `{{variable_name}}`)
+- **Variants Support**: Create multiple versions for each text box for easy switching
+- **Auto Save**: Automatically save edits to local storage
+- **Undo/Redo**: Support Ctrl+Z for undo and Ctrl+Y for redo
+- **Workspace Management**: Select workspace directory and manage `.prompt` files
 
-### Sidebar
-- **File Browser**: Browse and manage `.prompt` files in your workspace
-- **File Operations**: Create, rename, copy, and delete files
-- **Workspace Management**: Select and switch between workspaces
+### 📥 Download & Install
 
-### Workbench
-- **Generate**: Combine all text boxes into a single prompt
-- **Generate & Copy**: Generate and automatically copy to clipboard
-- **Outline View**: Visual overview of all text boxes with drag-and-drop reordering
-- **Preview**: Real-time preview of the generated output
+We provide pre-built installation packages for Windows, macOS, and Linux.
 
-## Tech Stack
+1. Visit the [Releases page](../../releases)
+2. Download the appropriate installation package for your operating system:
+   - **Windows**: Download `.exe` or `.msi` installer
+   - **macOS**: Download `.dmg` disk image
+   - **Linux**: Download `.AppImage` or corresponding deb/rpm package
+3. Run the installer and follow the prompts to complete the installation
 
-- **Frontend**: Svelte 4 + TypeScript
-- **Backend**: Rust (Tauri)
-- **Styling**: Tailwind CSS
-- **Build Tool**: Vite
+### 🚀 Quick Start
 
-## Installation
+1. **Select Workspace**: Click "Select Workspace" in the left sidebar to choose your working directory
+2. **Create File**: Click "+ New File" to create a new `.prompt` file
+3. **Add Text Boxes**: Click "+ Text Box" to add text boxes
+4. **Edit Content**: Enter your prompt content in the text boxes
+5. **Set Mode**: Use the dropdown to set text box mode (Normal/Disabled/Shadow)
+6. **Generate Prompt**: Click "Generate" or "Generate & Copy" to generate the final prompt
 
-### Prerequisites
+### 💡 Tips
+
+- **Drag to Reorder**: Drag text boxes directly to adjust their order
+- **Resize**: Drag the bottom edge of text boxes to adjust height
+- **Use Variables**: Set text box to "Shadow" mode and use `{{variable_name}}` in other text boxes to reference it
+- **Create Variants**: Click the "+" button on the right side of text boxes to create variants for comparing different versions
+
+### ⌨️ Keyboard Shortcuts
+
+- `Ctrl + Z`: Undo
+- `Ctrl + Y`: Redo
+
+---
+
+## 🛠️ 开发者指南 | Developer Guide
+
+### 技术栈 | Tech Stack
+
+- **前端 Frontend**: Svelte 4 + TypeScript
+- **后端 Backend**: Rust (Tauri)
+- **样式 Styling**: Tailwind CSS
+- **构建工具 Build Tool**: Vite
+
+### 环境要求 | Prerequisites
 
 - Node.js 18+ and npm
 - Rust and Cargo
 - Tauri CLI
 
-### Setup
+### 安装依赖 | Install Dependencies
 
-1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Install Tauri CLI:
+### 安装 Tauri CLI | Install Tauri CLI
+
 ```bash
 npm install -g @tauri-apps/cli
 ```
 
-## Development
+### 开发模式 | Development
 
-Run the development server:
+运行开发服务器：
+
 ```bash
-npm run dev
+npm run tauri dev
 ```
 
-This will start both the Vite dev server and the Tauri application.
+这将同时启动 Vite 开发服务器和 Tauri 应用程序。
 
-## Building
+### 构建 | Building
 
-Build for production:
-```bash
-npm run build
-```
+构建 Tauri 应用程序：
 
-Build the Tauri application:
 ```bash
 npm run tauri build
 ```
 
-## Project Structure
+### 项目结构 | Project Structure
 
 ```
 prompt-combiner/
 ├── src/
 │   ├── components/
-│   │   ├── TextBox.svelte      # Text box component with modes and variants
-│   │   ├── Separator.svelte     # Separator component
-│   │   ├── Sidebar.svelte       # File browser and navigation
-│   │   └── Workbench.svelte     # Generation and outline view
-│   ├── App.svelte               # Main application component
-│   ├── main.ts                  # Application entry point
-│   ├── app.css                  # Global styles
-│   ├── store.ts                 # Svelte store for state management
-│   ├── types.ts                 # TypeScript type definitions
-│   └── tauri-api.ts             # Tauri API wrapper functions
+│   │   ├── TextBox.svelte      # 文本框组件 | Text box component with modes and variants
+│   │   ├── Separator.svelte     # 分隔符组件 | Separator component
+│   │   ├── Sidebar.svelte       # 文件浏览器和导航 | File browser and navigation
+│   │   └── Workbench.svelte     # 生成和大纲视图 | Generation and outline view
+│   ├── App.svelte               # 主应用组件 | Main application component
+│   ├── main.ts                  # 应用入口 | Application entry point
+│   ├── app.css                  # 全局样式 | Global styles
+│   ├── store.ts                 # Svelte 状态管理 | Svelte store for state management
+│   ├── types.ts                 # TypeScript 类型定义 | TypeScript type definitions
+│   └── tauri-api.ts             # Tauri API 封装 | Tauri API wrapper functions
 ├── src-tauri/
 │   ├── src/
-│   │   └── main.rs              # Rust backend with file I/O
-│   ├── Cargo.toml               # Rust dependencies
-│   └── tauri.conf.json          # Tauri configuration
-├── package.json                 # Node.js dependencies
-├── vite.config.ts               # Vite configuration
-├── tailwind.config.js           # Tailwind CSS configuration
-└── tsconfig.json                # TypeScript configuration
+│   │   └── main.rs              # Rust 后端文件 I/O | Rust backend with file I/O
+│   ├── Cargo.toml               # Rust 依赖 | Rust dependencies
+│   └── tauri.conf.json          # Tauri 配置 | Tauri configuration
+├── package.json                 # Node.js 依赖 | Node.js dependencies
+├── vite.config.ts               # Vite 配置 | Vite configuration
+├── tailwind.config.js           # Tailwind CSS 配置 | Tailwind CSS configuration
+└── tsconfig.json                # TypeScript 配置 | TypeScript configuration
 ```
 
-## Usage
+### 文件格式 | File Format
 
-1. **Select Workspace**: Click "Select Workspace" to choose your working directory
-2. **Create File**: Click "+ New File" to create a new `.prompt` file
-3. **Add Text Boxes**: Click "+ Text Box" to add new text boxes
-4. **Configure Modes**: Use the dropdown to set text box mode (Normal/Disabled/Shadow)
-5. **Add Variants**: Click the "+" button on the right side of text boxes to create variants
-6. **Generate**: Click "Generate" or "Generate & Copy" to create the final prompt
-
-## File Format
-
-`.prompt` files are stored as JSON with the following structure:
+`.prompt` 文件以 JSON 格式存储，结构如下：
 
 ```json
 {
-  "name": "example.prompt",
-  "text_boxes": [
-    {
+  "order": ["id1", "id2"],
+  "text_boxes": {
+    "id1": {
       "id": "unique-id",
-      "title": "Example Title",
-      "content": "Example content",
-      "mode": "normal",
-      "checked": true,
+      "mode": "normal"
+    }
+  },
+  "variants": {
+    "id1": {
       "height": 150,
-      "variants": ["content"],
-      "currentVariant": 0
+      "current_variant_index": 0,
+      "variants": [
+        {
+          "content": "Example content",
+          "title": "Example Title"
+        }
+      ]
     }
-  ],
-  "separators": [
-    {
-      "id": "sep-id",
-      "content": "\\n\\n"
-    }
-  ]
+  },
+  "separators": {}
 }
 ```
 
-## Design Principles
+### 设计原则 | Design Principles
 
-- **Single Responsibility Principle (SRP)**: Each component and module has a single, well-defined purpose
-- **Defensive Programming**: All file operations include error handling
-- **Performance**: Optimized for both runtime performance and low resource usage when idle
-- **Storage**: Data persistence with minimal disk I/O operations
-- **UI/UX**: Clean, simple interface with color blocks for easy navigation
+- **单一职责原则 (SRP)**：每个组件和模块都有单一、明确定义的目的
+- **防御性编程**：所有文件操作都包含错误处理
+- **性能优化**：针对运行时性能和空闲时低资源使用进行了优化
+- **数据持久化**：通过最小化磁盘 I/O 操作实现数据持久化
+- **用户体验**：简洁、简单的界面，使用色块便于导航
 
-## License
+---
+
+## 📄 许可证 | License
 
 MIT
+
+---
+
+## 🙏 致谢 | Acknowledgments
+
+感谢 **Trae IDE** 帮助完成这个项目。
+
+Special thanks to **Trae IDE** for helping complete this project.
