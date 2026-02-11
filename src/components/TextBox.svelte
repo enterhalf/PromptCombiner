@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dndzone } from "svelte-dnd-action";
   import { createEventDispatcher } from "svelte";
   import type { TextBox, VariantData, Variant } from "../types";
 
@@ -16,11 +17,6 @@
   let isTitleFocused = false;
   let isEditingTitle = false;
 
-  // 变体拖动排序相关
-  let draggedVariantIndex: number | null = null;
-  let dragOverVariantIndex: number | null = null;
-  let variantContainerElement: HTMLElement;
-
   $: height = variantData.height;
   $: currentVariantIndex = variantData.current_variant_index;
   $: variantList = variantData.variants || [];
@@ -31,6 +27,13 @@
   };
   $: currentContent = currentVariant.content;
   $: currentTitle = currentVariant.title;
+
+  // 用于 dnd-zone 的变体列表
+  $: variantItems = variantList.map((variant, idx) => ({
+    id: idx,
+    variant,
+    index: idx,
+  }));
 
   // 获取显示的标题（如果没有保存的标题，则从内容生成预览）
   function getDisplayTitle(variant: Variant): string {
@@ -46,7 +49,6 @@
   }
 
   function handleDragStart(e: DragEvent) {
-    e.stopPropagation();
     isDragging = true;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
@@ -56,7 +58,6 @@
   }
 
   function handleDragEnd(e: DragEvent) {
-    e.stopPropagation();
     isDragging = false;
     dispatch("dragend");
   }
@@ -215,58 +216,23 @@
     });
   }
 
-  // 变体拖动排序 - 开始拖动
-  function handleVariantDragStart(e: DragEvent, index: number) {
-    e.stopPropagation();
-    draggedVariantIndex = index;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", String(index));
-    }
+  // dnd-zone 的变体排序处理
+  function handleVariantDndConsider(e: CustomEvent) {
+    variantItems = e.detail.items;
   }
 
-  // 变体拖动排序 - 拖动经过
-  function handleVariantDragOver(e: DragEvent, index: number) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = "move";
-    }
-    dragOverVariantIndex = index;
-  }
-
-  // 变体拖动排序 - 放置
-  function handleVariantDrop(e: DragEvent, dropIndex: number) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (draggedVariantIndex === null || draggedVariantIndex === dropIndex) {
-      draggedVariantIndex = null;
-      dragOverVariantIndex = null;
-      return;
-    }
+  function handleVariantDndFinalize(e: CustomEvent) {
+    variantItems = e.detail.items;
 
     // 重新排序变体
-    const newVariants = [...(variantData.variants || [])];
-    const [movedVariant] = newVariants.splice(draggedVariantIndex, 1);
-    newVariants.splice(dropIndex, 0, movedVariant);
+    const newVariants = variantItems.map((item) => item.variant);
 
-    // 更新当前选中的变体索引
-    let newCurrentIndex = currentVariantIndex;
-    if (draggedVariantIndex === currentVariantIndex) {
-      // 如果移动的是当前选中的变体
-      newCurrentIndex = dropIndex;
-    } else if (
-      draggedVariantIndex < currentVariantIndex &&
-      dropIndex >= currentVariantIndex
-    ) {
-      // 如果从前方向后移动，且经过当前选中的变体
-      newCurrentIndex = currentVariantIndex - 1;
-    } else if (
-      draggedVariantIndex > currentVariantIndex &&
-      dropIndex <= currentVariantIndex
-    ) {
-      // 如果从后方向前移动，且经过当前选中的变体
-      newCurrentIndex = currentVariantIndex + 1;
+    // 找到当前选中的变体在新列表中的位置
+    const currentVariantId = variantList[currentVariantIndex];
+    let newCurrentIndex = newVariants.findIndex((v) => v === currentVariantId);
+    if (newCurrentIndex === -1) {
+      // 如果找不到（不应该发生），保持原来的索引或设为0
+      newCurrentIndex = Math.min(currentVariantIndex, newVariants.length - 1);
     }
 
     dispatch("variantschange", {
@@ -277,16 +243,6 @@
         current_variant_index: newCurrentIndex,
       },
     });
-
-    draggedVariantIndex = null;
-    dragOverVariantIndex = null;
-  }
-
-  // 变体拖动排序 - 拖动结束
-  function handleVariantDragEnd(e: DragEvent) {
-    e.stopPropagation();
-    draggedVariantIndex = null;
-    dragOverVariantIndex = null;
   }
 
   $: modeColor =
@@ -357,44 +313,29 @@
     <div class="flex-1 min-w-0">
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
+        use:dndzone={{
+          items: variantItems,
+          flipDurationMs: 200,
+          type: "variant",
+        }}
+        on:consider={handleVariantDndConsider}
+        on:finalize={handleVariantDndFinalize}
         class="flex flex-wrap gap-1 justify-center"
         role="list"
-        bind:this={variantContainerElement}
-        on:dragover={(e) => {
-          e.preventDefault();
-          if (e.dataTransfer) {
-            e.dataTransfer.dropEffect = "move";
-          }
-        }}
-        on:drop={(e) => {
-          e.preventDefault();
-          // 如果 drop 在容器上但没有在具体的变体上，默认放到最后
-          if (draggedVariantIndex !== null && dragOverVariantIndex === null) {
-            handleVariantDrop(e, variantList.length - 1);
-          }
-        }}
       >
-        {#each variantList as variant, vIndex (vIndex)}
+        {#each variantItems as item (item.id)}
+          {@const vIndex = item.index}
+          {@const variant = item.variant}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
-            draggable="true"
             role="button"
             tabindex="0"
             on:click={() => handleSwitchVariant(vIndex)}
             on:keydown={(e) => e.key === "Enter" && handleSwitchVariant(vIndex)}
-            on:dragstart={(e) => handleVariantDragStart(e, vIndex)}
-            on:dragover={(e) => handleVariantDragOver(e, vIndex)}
-            on:drop={(e) => handleVariantDrop(e, vIndex)}
-            on:dragend={(e) => handleVariantDragEnd(e)}
             class="px-2 py-1 text-xs rounded border transition-all duration-150 cursor-grab active:cursor-grabbing select-none max-w-[80px] truncate
               {vIndex === currentVariantIndex
               ? 'bg-blue-600 border-blue-500 text-white'
-              : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'}
-              {dragOverVariantIndex === vIndex && draggedVariantIndex !== vIndex
-              ? 'ring-2 ring-yellow-400'
-              : ''}
-              {draggedVariantIndex === vIndex ? 'opacity-50' : ''}"
+              : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'}"
             title="{getDisplayTitle(
               variant
             )} - Drag to reorder, click to switch"

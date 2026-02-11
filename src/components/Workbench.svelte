@@ -1,14 +1,11 @@
 <script lang="ts">
+  import { dndzone } from "svelte-dnd-action";
   import { appStore } from "../store";
   import type { PromptFile } from "../types";
 
   export let currentFile: PromptFile;
 
-  let draggingIndex: number | null = null;
-  let dropTargetIndex: number | null = null;
-  let containerElement: HTMLElement;
-
-  // 直接从 currentFile.order 获取大纲项，避免状态不同步
+  // 用于 dnd-zone 的列表
   $: outlineItems = currentFile.order.map((textBoxId, index) => {
     const tb = currentFile.text_boxes[textBoxId];
     const variantData = currentFile.variants[textBoxId];
@@ -19,7 +16,7 @@
       currentVariant?.content?.substring(0, 20) ||
       `Text Box ${index + 1}`;
     return {
-      id: tb?.id || textBoxId,
+      id: textBoxId,
       title: title,
       type: "textbox" as const,
     };
@@ -47,94 +44,22 @@
     }
   }
 
-  function handleDragStart(e: DragEvent, index: number) {
-    e.stopPropagation();
-    draggingIndex = index;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", String(index));
-    }
+  // dnd-zone 的排序处理
+  function handleDndConsider(e: CustomEvent) {
+    outlineItems = e.detail.items;
   }
 
-  function handleContainerDragOver(e: DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = "move";
-    }
+  function handleDndFinalize(e: CustomEvent) {
+    outlineItems = e.detail.items;
 
-    if (!containerElement || draggingIndex === null) return;
-
-    // 计算拖放目标位置
-    const rect = containerElement.getBoundingClientRect();
-    const mouseY = e.clientY - rect.top;
-
-    // 获取所有子元素的位置
-    const children = Array.from(containerElement.children);
-    let newDropIndex = outlineItems.length;
-
-    for (let i = 0; i < children.length; i++) {
-      const child = children[i] as HTMLElement;
-      const childRect = child.getBoundingClientRect();
-      const childMiddle = childRect.top + childRect.height / 2 - rect.top;
-
-      if (mouseY < childMiddle) {
-        newDropIndex = i;
-        break;
-      }
-    }
-
-    dropTargetIndex = newDropIndex;
-  }
-
-  function handleContainerDragLeave(e: DragEvent) {
-    // 只有当真正离开容器时才重置
-    if (!containerElement?.contains(e.relatedTarget as Node)) {
-      dropTargetIndex = null;
-    }
-  }
-
-  function handleContainerDrop(e: DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (draggingIndex === null) {
-      dropTargetIndex = null;
-      return;
-    }
-
-    // 如果没有有效的放置目标，默认放在最后
-    let targetIndex =
-      dropTargetIndex !== null ? dropTargetIndex : outlineItems.length;
-
-    // 如果拖放到自己后面，需要调整索引
-    if (draggingIndex < targetIndex) {
-      targetIndex = targetIndex - 1;
-    }
-
-    if (draggingIndex !== targetIndex) {
-      // 直接更新 order 数组
-      const newOrder = [...currentFile.order];
-      const [movedItem] = newOrder.splice(draggingIndex, 1);
-      newOrder.splice(targetIndex, 0, movedItem);
-
-      appStore.setCurrentFile({
-        name: currentFile.name,
-        order: newOrder,
-        text_boxes: currentFile.text_boxes,
-        variants: currentFile.variants,
-        separators: currentFile.separators,
-      });
-    }
-
-    draggingIndex = null;
-    dropTargetIndex = null;
-  }
-
-  function handleDragEnd(e: DragEvent) {
-    e.stopPropagation();
-    draggingIndex = null;
-    dropTargetIndex = null;
+    const newOrder = outlineItems.map((item) => item.id);
+    appStore.setCurrentFile({
+      name: currentFile.name,
+      order: newOrder,
+      text_boxes: currentFile.text_boxes,
+      variants: currentFile.variants,
+      separators: currentFile.separators,
+    });
   }
 
   function handleOutlineClick(id: string) {
@@ -206,51 +131,38 @@
     </button>
   </div>
 
+  <h3 class="text-white font-bold mb-2">Outline</h3>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="flex-1 overflow-y-auto pr-2"
-    role="list"
-    on:dragover={handleContainerDragOver}
-    on:dragleave={handleContainerDragLeave}
-    on:drop={handleContainerDrop}
+    use:dndzone={{
+      items: outlineItems,
+      flipDurationMs: 200,
+      type: "outline",
+    }}
+    on:consider={handleDndConsider}
+    on:finalize={handleDndFinalize}
+    class="flex-1 overflow-y-auto pr-2 space-y-1"
   >
-    <h3 class="text-white font-bold mb-2">Outline</h3>
-    <div class="space-y-1" bind:this={containerElement}>
-      {#each outlineItems as item, index (item.id)}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div
-          draggable="true"
-          role="listitem"
-          on:dragstart={(e) => handleDragStart(e, index)}
-          on:dragend={handleDragEnd}
-          class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move select-none {draggingIndex ===
-          index
-            ? 'opacity-50'
-            : ''} {dropTargetIndex === index
-            ? 'border-t-2 border-blue-500'
-            : ''}"
+    {#each outlineItems as item (item.id)}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div
+        class="flex items-center p-2 rounded bg-gray-800 hover:bg-gray-700 cursor-move select-none"
+      >
+        <span class="mr-2 text-gray-400 cursor-grab active:cursor-grabbing"
+          >☰</span
         >
-          <span class="mr-2 text-gray-400 cursor-grab active:cursor-grabbing"
-            >☰</span
-          >
-          <span class="mr-2">📝</span>
-          <span
-            class="text-gray-300 text-sm truncate flex-1 cursor-pointer"
-            role="button"
-            tabindex="0"
-            on:click={() => handleOutlineClick(item.id)}
-            on:keydown={(e) => e.key === "Enter" && handleOutlineClick(item.id)}
-          >
-            {item.title}
-          </span>
-        </div>
-      {/each}
-
-      <!-- 拖放到最后的位置指示器 -->
-      {#if dropTargetIndex === outlineItems.length && draggingIndex !== null}
-        <div class="border-t-2 border-blue-500 mt-2"></div>
-      {/if}
-    </div>
+        <span class="mr-2">📝</span>
+        <span
+          class="text-gray-300 text-sm truncate flex-1 cursor-pointer"
+          role="button"
+          tabindex="0"
+          on:click={() => handleOutlineClick(item.id)}
+          on:keydown={(e) => e.key === "Enter" && handleOutlineClick(item.id)}
+        >
+          {item.title}
+        </span>
+      </div>
+    {/each}
   </div>
 </div>
 
