@@ -1,5 +1,7 @@
 # Prompt Combiner
 
+![Prompt Combiner Screenshot](./assets/软件界面.png)
+
 ## 中文文档
 
 ### 🎯 简介
