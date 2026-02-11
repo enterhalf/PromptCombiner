@@ -189,14 +189,16 @@
     });
 
     let lastSeparator = "\n\n";
+    let isFirstContent = true;
 
-    currentFile.order.forEach((textBoxId, index) => {
+    currentFile.order.forEach((textBoxId) => {
       const tb = currentFile.text_boxes[textBoxId];
-      if (!tb || tb.mode === "disabled") return;
+      if (!tb || tb.mode === "disabled" || tb.mode === "shadow") return;
 
-      if (index > 0) {
+      if (!isFirstContent) {
         result += lastSeparator;
       }
+      isFirstContent = false;
 
       const variantData = currentFile.variants[textBoxId];
       const currentVariantIndex = variantData?.current_variant_index || 0;

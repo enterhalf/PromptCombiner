@@ -124,16 +124,6 @@
     dispatch("change", { textBox });
   }
 
-  function handleContentChange(e: Event) {
-    const textarea = e.target as HTMLTextAreaElement;
-    updateVariantContent(currentVariantIndex, textarea.value);
-  }
-
-  function handleInput(e: Event) {
-    const textarea = e.target as HTMLTextAreaElement;
-    updateVariantContent(currentVariantIndex, textarea.value);
-  }
-
   function handleVariantInput(vIndex: number) {
     return (e: Event) => {
       const textarea = e.target as HTMLTextAreaElement;
@@ -393,7 +383,6 @@
           <textarea
             value={variant.content}
             on:input={handleVariantInput(vIndex)}
-            on:blur={handleContentChange}
             class="w-full h-full bg-gray-900 text-white p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter your text here..."
           ></textarea>

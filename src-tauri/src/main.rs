@@ -201,19 +201,18 @@ fn generate_context(prompt_file: PromptFile) -> Result<String, String> {
     }
 
     let mut last_separator = "\n\n".to_string();
+    let mut is_first_content = true;
 
-    for (index, text_box_id) in prompt_file.order.iter().enumerate() {
+    for text_box_id in prompt_file.order.iter() {
         if let Some(text_box) = prompt_file.text_boxes.get(text_box_id) {
-            if text_box.mode == "disabled" {
+            if text_box.mode == "disabled" || text_box.mode == "shadow" {
                 continue;
             }
 
-            if index > 0 {
-                if let Some(sep) = separator_map.get(&format!("sep_{}", index - 1)) {
-                    last_separator = sep.clone();
-                }
+            if !is_first_content {
                 result.push_str(&last_separator);
             }
+            is_first_content = false;
 
             let mut content = String::new();
             if let Some(variant_data) = prompt_file.variants.get(text_box_id) {
