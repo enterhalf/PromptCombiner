@@ -19,12 +19,16 @@
   // 变体拖动排序相关
   let draggedVariantIndex: number | null = null;
   let dragOverVariantIndex: number | null = null;
+  let variantContainerElement: HTMLElement;
 
   $: height = variantData.height;
   $: currentVariantIndex = variantData.current_variant_index;
   $: variantList = variantData.variants || [];
   $: totalVariants = variantList.length;
-  $: currentVariant = variantList[currentVariantIndex] || { content: "", title: "" };
+  $: currentVariant = variantList[currentVariantIndex] || {
+    content: "",
+    title: "",
+  };
   $: currentContent = currentVariant.content;
   $: currentTitle = currentVariant.title;
 
@@ -42,6 +46,7 @@
   }
 
   function handleDragStart(e: DragEvent) {
+    e.stopPropagation();
     isDragging = true;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
@@ -51,6 +56,7 @@
   }
 
   function handleDragEnd(e: DragEvent) {
+    e.stopPropagation();
     isDragging = false;
     dispatch("dragend");
   }
@@ -249,10 +255,16 @@
     if (draggedVariantIndex === currentVariantIndex) {
       // 如果移动的是当前选中的变体
       newCurrentIndex = dropIndex;
-    } else if (draggedVariantIndex < currentVariantIndex && dropIndex >= currentVariantIndex) {
+    } else if (
+      draggedVariantIndex < currentVariantIndex &&
+      dropIndex >= currentVariantIndex
+    ) {
       // 如果从前方向后移动，且经过当前选中的变体
       newCurrentIndex = currentVariantIndex - 1;
-    } else if (draggedVariantIndex > currentVariantIndex && dropIndex <= currentVariantIndex) {
+    } else if (
+      draggedVariantIndex > currentVariantIndex &&
+      dropIndex <= currentVariantIndex
+    ) {
       // 如果从后方向前移动，且经过当前选中的变体
       newCurrentIndex = currentVariantIndex + 1;
     }
@@ -288,11 +300,15 @@
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
 
 <div
-  class="flex flex-col bg-gray-800 rounded-lg mb-2 overflow-hidden relative {isDragging ? 'opacity-50' : ''}"
+  class="flex flex-col bg-gray-800 rounded-lg mb-2 overflow-hidden relative {isDragging
+    ? 'opacity-50'
+    : ''}"
   style="height: {height}px;"
 >
   <!-- 标题栏 - 三栏布局 -->
-  <div class="flex items-center px-3 py-2 {modeColor} border-b border-gray-600 gap-2">
+  <div
+    class="flex items-center px-3 py-2 {modeColor} border-b border-gray-600 gap-2"
+  >
     <!-- 左侧：拖动句柄和标题 -->
     <div class="flex items-center gap-2 flex-shrink-0">
       <div
@@ -316,7 +332,7 @@
             role="button"
             tabindex="0"
             on:click={handleTitleClick}
-            on:keydown={(e) => e.key === 'Enter' && handleTitleClick()}
+            on:keydown={(e) => e.key === "Enter" && handleTitleClick()}
             title="Click to edit title"
           >
             {getDisplayTitle(currentVariant)}
@@ -339,7 +355,25 @@
 
     <!-- 中间：变体切换按钮列表 -->
     <div class="flex-1 min-w-0">
-      <div class="flex flex-wrap gap-1 justify-center">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="flex flex-wrap gap-1 justify-center"
+        role="list"
+        bind:this={variantContainerElement}
+        on:dragover={(e) => {
+          e.preventDefault();
+          if (e.dataTransfer) {
+            e.dataTransfer.dropEffect = "move";
+          }
+        }}
+        on:drop={(e) => {
+          e.preventDefault();
+          // 如果 drop 在容器上但没有在具体的变体上，默认放到最后
+          if (draggedVariantIndex !== null && dragOverVariantIndex === null) {
+            handleVariantDrop(e, variantList.length - 1);
+          }
+        }}
+      >
         {#each variantList as variant, vIndex (vIndex)}
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -348,18 +382,22 @@
             role="button"
             tabindex="0"
             on:click={() => handleSwitchVariant(vIndex)}
-            on:keydown={(e) => e.key === 'Enter' && handleSwitchVariant(vIndex)}
+            on:keydown={(e) => e.key === "Enter" && handleSwitchVariant(vIndex)}
             on:dragstart={(e) => handleVariantDragStart(e, vIndex)}
             on:dragover={(e) => handleVariantDragOver(e, vIndex)}
             on:drop={(e) => handleVariantDrop(e, vIndex)}
             on:dragend={(e) => handleVariantDragEnd(e)}
             class="px-2 py-1 text-xs rounded border transition-all duration-150 cursor-grab active:cursor-grabbing select-none max-w-[80px] truncate
               {vIndex === currentVariantIndex
-                ? 'bg-blue-600 border-blue-500 text-white'
-                : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'}
-              {dragOverVariantIndex === vIndex && draggedVariantIndex !== vIndex ? 'ring-2 ring-yellow-400' : ''}
+              ? 'bg-blue-600 border-blue-500 text-white'
+              : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'}
+              {dragOverVariantIndex === vIndex && draggedVariantIndex !== vIndex
+              ? 'ring-2 ring-yellow-400'
+              : ''}
               {draggedVariantIndex === vIndex ? 'opacity-50' : ''}"
-            title="{getDisplayTitle(variant)} - Drag to reorder, click to switch"
+            title="{getDisplayTitle(
+              variant
+            )} - Drag to reorder, click to switch"
           >
             {getDisplayTitle(variant)}
           </div>

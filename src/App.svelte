@@ -7,6 +7,8 @@
   import type { TextBox as TextBoxType, Variant } from "./types";
 
   let draggingIndex: number | null = null;
+  let dropTargetIndex: number | null = null;
+  let containerElement: HTMLElement;
 
   $: currentFile = $appStore.currentFile;
   $: activeTab = $appStore.activeTab;
@@ -115,24 +117,63 @@
 
   function handleDragEnd() {
     draggingIndex = null;
+    dropTargetIndex = null;
   }
 
-  function handleDragOver(e: DragEvent) {
+  function handleContainerDragOver(e: DragEvent) {
     e.preventDefault();
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "move";
     }
+
+    if (!containerElement || draggingIndex === null || !currentFile) return;
+
+    // 计算拖放目标位置
+    const rect = containerElement.getBoundingClientRect();
+    const mouseY = e.clientY - rect.top;
+
+    // 获取所有子元素的位置
+    const children = Array.from(containerElement.children);
+    let newDropIndex = currentFile.order.length;
+
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i] as HTMLElement;
+      const childRect = child.getBoundingClientRect();
+      const childMiddle = childRect.top + childRect.height / 2 - rect.top;
+
+      if (mouseY < childMiddle) {
+        newDropIndex = i;
+        break;
+      }
+    }
+
+    dropTargetIndex = newDropIndex;
   }
 
-  function handleDrop(e: DragEvent, index: number) {
+  function handleContainerDragLeave(e: DragEvent) {
+    // 只有当真正离开容器时才重置
+    if (!containerElement?.contains(e.relatedTarget as Node)) {
+      dropTargetIndex = null;
+    }
+  }
+
+  function handleContainerDrop(e: DragEvent) {
     e.preventDefault();
-    e.stopPropagation();
-    if (!currentFile) return;
-    if (draggingIndex !== null && draggingIndex !== index) {
+    if (!currentFile || draggingIndex === null) return;
+
+    // 如果没有有效的放置目标，默认放在最后
+    let targetIndex =
+      dropTargetIndex !== null ? dropTargetIndex : currentFile.order.length;
+
+    // 如果拖放到自己后面，需要调整索引
+    if (draggingIndex < targetIndex) {
+      targetIndex = targetIndex - 1;
+    }
+
+    if (draggingIndex !== targetIndex) {
       const newOrder = [...currentFile.order];
-      const item = newOrder[draggingIndex];
-      newOrder.splice(draggingIndex, 1);
-      newOrder.splice(index, 0, item);
+      const [item] = newOrder.splice(draggingIndex, 1);
+      newOrder.splice(targetIndex, 0, item);
       appStore.setCurrentFile({
         name: currentFile.name,
         order: newOrder,
@@ -141,7 +182,9 @@
         separators: currentFile.separators,
       });
     }
+
     draggingIndex = null;
+    dropTargetIndex = null;
   }
 
   async function handleSave() {
@@ -177,7 +220,8 @@
         const variantData = currentFile.variants[tb.id];
         const currentVariantIndex = variantData?.current_variant_index || 0;
         const currentVariant = variantData?.variants?.[currentVariantIndex];
-        const varName = currentVariant?.title.trim().toLowerCase().replace(" ", "_") || "";
+        const varName =
+          currentVariant?.title.trim().toLowerCase().replace(" ", "_") || "";
         const content = currentVariant?.content || "";
         if (varName) {
           shadowVars.set(varName, content);
@@ -228,19 +272,27 @@
         <h2 class="text-white font-bold">{currentFile.name}</h2>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-4">
-        <div class="max-w-4xl mx-auto">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        class="flex-1 overflow-y-auto p-4"
+        role="list"
+        on:dragover={handleContainerDragOver}
+        on:dragleave={handleContainerDragLeave}
+        on:drop={handleContainerDrop}
+      >
+        <div class="max-w-4xl mx-auto" bind:this={containerElement}>
           {#each currentFile.order as textBoxId, index (textBoxId)}
             {@const textBox = currentFile.text_boxes[textBoxId]}
             {@const variantData = currentFile.variants[textBoxId]}
             {#if textBox && variantData}
-              <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 id={textBox.id}
                 role="listitem"
-                on:dragover={handleDragOver}
-                on:drop={(e) => handleDrop(e, index)}
-                class={draggingIndex === index ? 'opacity-50' : ''}
+                class="{draggingIndex === index
+                  ? 'opacity-50'
+                  : ''} {dropTargetIndex === index
+                  ? 'border-t-2 border-blue-500'
+                  : ''}"
               >
                 <TextBox
                   {textBox}
@@ -256,6 +308,11 @@
               </div>
             {/if}
           {/each}
+
+          <!-- 拖放到最后的位置指示器 -->
+          {#if dropTargetIndex === currentFile.order.length && draggingIndex !== null}
+            <div class="border-t-2 border-blue-500 mt-2"></div>
+          {/if}
 
           <div class="flex gap-2 mt-4">
             <button
