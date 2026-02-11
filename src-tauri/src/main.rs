@@ -191,10 +191,12 @@ fn generate_context(prompt_file: PromptFile) -> Result<String, String> {
     for (text_box_id, text_box) in &prompt_file.text_boxes {
         if text_box.mode == "shadow" {
             if let Some(variant_data) = prompt_file.variants.get(text_box_id) {
-                let current_index = variant_data.current_variant_index;
-                if let Some(variant) = variant_data.variants.get(current_index) {
+                // 收集所有变体的变量，而不仅仅是当前激活的变体
+                for variant in &variant_data.variants {
                     let var_name = variant.title.trim().to_lowercase().replace(' ', "_");
-                    shadow_vars.insert(var_name, variant.content.clone());
+                    if !var_name.is_empty() {
+                        shadow_vars.insert(var_name, variant.content.clone());
+                    }
                 }
             }
         }

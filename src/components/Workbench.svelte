@@ -77,14 +77,15 @@
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const variantData = currentFile.variants[tb.id];
-        const currentVariantIndex = variantData?.current_variant_index || 0;
-        const currentVariant = variantData?.variants?.[currentVariantIndex];
-        const varName =
-          currentVariant?.title.trim().toLowerCase().replace(" ", "_") || "";
-        const content = currentVariant?.content || "";
-        if (varName) {
-          shadowVars.set(varName, content);
-        }
+        // 收集所有变体的变量，而不仅仅是当前激活的变体
+        variantData?.variants?.forEach((variant) => {
+          const varName =
+            variant.title.trim().toLowerCase().replace(/\s+/g, "_") || "";
+          const content = variant.content || "";
+          if (varName) {
+            shadowVars.set(varName, content);
+          }
+        });
       }
     });
 
