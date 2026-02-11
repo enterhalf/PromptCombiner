@@ -40,6 +40,7 @@ export interface AppState {
   activeTab: "files" | "workbench";
   generatedText: string;
   showGeneratedModal: boolean;
+  recentWorkspaces: string[];
 }
 
 // 框体类型，为未来扩展预留

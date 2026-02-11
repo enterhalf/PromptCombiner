@@ -200,7 +200,7 @@ fn generate_context(prompt_file: PromptFile) -> Result<String, String> {
         }
     }
 
-    let mut last_separator = "\n\n".to_string();
+    let last_separator = "\n\n".to_string();
     let mut is_first_content = true;
 
     for text_box_id in prompt_file.order.iter() {

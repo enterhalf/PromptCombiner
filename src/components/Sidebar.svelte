@@ -13,6 +13,7 @@
   import Workbench from "./Workbench.svelte";
 
   let workspacePath = "";
+  let recentWorkspaces: string[] = [];
   let workspaceItems: WorkspaceItem[] = [];
   let showNewFileDialog = false;
   let newFileName = "";
@@ -31,15 +32,18 @@
   let startHeight = 0;
   let sidebarHeight = 0;
 
+  // 订阅store
+  appStore.subscribe((state) => {
+    workspacePath = state.workspacePath;
+    recentWorkspaces = state.recentWorkspaces;
+    workspaceItems = state.workspaceItems;
+  });
+
   async function loadWorkspace() {
     if (workspacePath) {
-      workspaceItems = await getWorkspaceItems(workspacePath);
-      appStore.setWorkspaceItems(workspaceItems);
+      const items = await getWorkspaceItems(workspacePath);
+      appStore.setWorkspaceItems(items);
     }
-  }
-
-  async function handleLoadWorkspace() {
-    await loadWorkspace();
   }
 
   async function handleSelectWorkspace() {
@@ -51,8 +55,7 @@
       });
 
       if (selected && typeof selected === "string") {
-        workspacePath = selected;
-        appStore.setWorkspacePath(workspacePath);
+        appStore.setWorkspacePath(selected);
         await loadWorkspace();
       }
     } catch (error) {
@@ -71,6 +74,35 @@
         alert(`Failed to select workspace: ${errorMessage}`);
       }
     }
+  }
+
+  async function handleSelectRecentWorkspace(path: string) {
+    appStore.setWorkspacePath(path);
+    await loadWorkspace();
+  }
+
+  function handleRemoveRecentWorkspace(e: Event, path: string) {
+    e.stopPropagation();
+    appStore.removeRecentWorkspace(path);
+  }
+
+  function handleClearWorkspace(e: Event) {
+    e.stopPropagation();
+    appStore.setWorkspacePath("");
+    appStore.setWorkspaceItems([]);
+    appStore.setCurrentFile(null, "");
+  }
+
+  function getFolderName(path: string): string {
+    const parts = path.split(/[/\\]/);
+    return parts[parts.length - 1] || path;
+  }
+
+  function getShortPath(path: string): string {
+    if (path.length <= 35) return path;
+    const parts = path.split(/[/\\]/);
+    if (parts.length <= 2) return path;
+    return ".../" + parts.slice(-2).join("/");
   }
 
   async function handleOpenFile(item: WorkspaceItem) {
@@ -182,7 +214,8 @@
     if (!isResizing) return;
     const diff = e.clientY - startY;
     const diffPercent = (diff / sidebarHeight) * 100;
-    let newHeight = startHeight + diffPercent;
+    // 反向调整：向上拖动时增加Files高度（Workbench高度减少）
+    let newHeight = startHeight - diffPercent;
     // 限制最小和最大高度
     newHeight = Math.max(20, Math.min(80, newHeight));
     filesHeight = newHeight;
@@ -197,35 +230,7 @@
 
 <div class="w-64 bg-gray-900 border-r border-gray-700 flex flex-col h-full sidebar-container">
   <div class="p-4 border-b border-gray-700">
-    <h1 class="text-white text-lg font-bold mb-3">Prompt Combiner</h1>
-
-    <div class="flex gap-2 mb-3">
-      <button
-        on:click={handleSelectWorkspace}
-        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm"
-        disabled={!isTauriEnv}
-        class:opacity-50={!isTauriEnv}
-        class:cursor-not-allowed={!isTauriEnv}
-      >
-        Select Workspace
-      </button>
-    </div>
-
-    {#if !isTauriEnv}
-      <div
-        class="bg-yellow-900/50 border border-yellow-700 text-yellow-200 text-xs p-2 rounded mb-3"
-      >
-        ⚠️ Running in browser mode. File features require Tauri desktop app. Run <code
-          class="bg-gray-800 px-1 rounded">npm run tauri dev</code
-        > instead.
-      </div>
-    {/if}
-
-    {#if workspacePath}
-      <div class="text-gray-400 text-xs mb-2 truncate">
-        {workspacePath}
-      </div>
-    {/if}
+    <h1 class="text-white text-lg font-bold">Prompt Combiner</h1>
   </div>
 
   <!-- Workbench 区域 -->
@@ -261,62 +266,143 @@
   <div
     class="flex-1 flex flex-col overflow-hidden"
   >
+    <!-- Files 标题栏 + 工作区选择按钮 -->
     <div class="px-3 py-2 bg-gray-800 border-b border-gray-700">
-      <h2 class="text-white font-medium text-sm">Files</h2>
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-white font-medium text-sm">Files</h2>
+      </div>
+      
+      <!-- 工作区选择按钮 - 显示当前路径或提示文字 -->
+      <div class="relative">
+        <button
+          on:click={handleSelectWorkspace}
+          class="w-full text-left px-2 py-1.5 rounded text-xs transition-colors border pr-7 {workspacePath ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600' : 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700'}"
+          disabled={!isTauriEnv}
+          class:opacity-50={!isTauriEnv}
+          class:cursor-not-allowed={!isTauriEnv}
+          title={workspacePath || "Select a workspace folder"}
+        >
+          <div class="flex items-center">
+            <span class="mr-1.5">{workspacePath ? "📁" : "📂"}</span>
+            <span class="truncate flex-1">
+              {workspacePath ? getShortPath(workspacePath) : "选择工作区..."}
+            </span>
+          </div>
+        </button>
+        {#if workspacePath}
+          <button
+            on:click={handleClearWorkspace}
+            class="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-400 px-1 py-0.5 rounded transition-colors"
+            title="关闭工作区"
+          >
+            ✕
+          </button>
+        {/if}
+      </div>
+
+      {#if !isTauriEnv}
+        <div
+          class="mt-2 bg-yellow-900/50 border border-yellow-700 text-yellow-200 text-xs p-1.5 rounded"
+        >
+          ⚠️ 浏览器模式，文件功能需使用 Tauri 桌面应用
+        </div>
+      {/if}
     </div>
+
     <div class="flex-1 overflow-y-auto p-2">
       {#if workspacePath}
+        <!-- 已打开工作区 - 显示文件列表 -->
         <button
           on:click={() => (showNewFileDialog = true)}
           class="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm mb-3"
         >
           + New File
         </button>
-      {/if}
 
-      {#each workspaceItems as item}
-        <div
-          class="flex items-center justify-between p-2 rounded hover:bg-gray-800 cursor-pointer mb-1 group"
-          role="button"
-          tabindex="0"
-          on:click={() => handleOpenFile(item)}
-          on:keydown={(e) => e.key === "Enter" && handleOpenFile(item)}
-        >
-          <div class="flex items-center flex-1 min-w-0">
-            <span class="mr-2">
-              {item.is_file ? "📄" : "📁"}
-            </span>
-            <span class="text-gray-300 text-sm truncate">
-              {item.name}
-            </span>
+        {#each workspaceItems as item}
+          <div
+            class="flex items-center justify-between p-2 rounded hover:bg-gray-800 cursor-pointer mb-1 group"
+            role="button"
+            tabindex="0"
+            on:click={() => handleOpenFile(item)}
+            on:keydown={(e) => e.key === "Enter" && handleOpenFile(item)}
+          >
+            <div class="flex items-center flex-1 min-w-0">
+              <span class="mr-2">
+                {item.is_file ? "📄" : "📁"}
+              </span>
+              <span class="text-gray-300 text-sm truncate">
+                {item.name}
+              </span>
+            </div>
+            {#if item.is_file}
+              <div class="flex gap-1 opacity-0 group-hover:opacity-100">
+                <button
+                  on:click|stopPropagation={() => handleRenameClick(item)}
+                  class="text-gray-400 hover:text-white px-1"
+                  title="Rename"
+                >
+                  ✎
+                </button>
+                <button
+                  on:click|stopPropagation={() => handleCopyClick(item)}
+                  class="text-gray-400 hover:text-white px-1"
+                  title="Copy"
+                >
+                  📋
+                </button>
+                <button
+                  on:click|stopPropagation={() => handleDelete(item)}
+                  class="text-gray-400 hover:text-red-400 px-1"
+                  title="Delete"
+                >
+                  🗑
+                </button>
+              </div>
+            {/if}
           </div>
-          {#if item.is_file}
-            <div class="flex gap-1 opacity-0 group-hover:opacity-100">
+        {/each}
+      {:else}
+        <!-- 未打开工作区 - 显示最近工作区列表 -->
+        {#if recentWorkspaces.length > 0}
+          <div class="text-gray-400 text-xs mb-2 px-1">最近打开</div>
+          {#each recentWorkspaces as recentPath}
+            <div
+              class="flex items-center justify-between p-2 rounded hover:bg-gray-800 cursor-pointer mb-1 group"
+              role="button"
+              tabindex="0"
+              on:click={() => handleSelectRecentWorkspace(recentPath)}
+              on:keydown={(e) => e.key === "Enter" && handleSelectRecentWorkspace(recentPath)}
+              title={recentPath}
+            >
+              <div class="flex items-center flex-1 min-w-0">
+                <span class="mr-2">📁</span>
+                <div class="flex flex-col flex-1 min-w-0">
+                  <span class="text-gray-300 text-sm truncate">
+                    {getFolderName(recentPath)}
+                  </span>
+                  <span class="text-gray-500 text-xs truncate">
+                    {getShortPath(recentPath)}
+                  </span>
+                </div>
+              </div>
               <button
-                on:click|stopPropagation={() => handleRenameClick(item)}
-                class="text-gray-400 hover:text-white px-1"
-                title="Rename"
+                on:click={(e) => handleRemoveRecentWorkspace(e, recentPath)}
+                class="text-gray-500 hover:text-red-400 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove from history"
               >
-                ✎
-              </button>
-              <button
-                on:click|stopPropagation={() => handleCopyClick(item)}
-                class="text-gray-400 hover:text-white px-1"
-                title="Copy"
-              >
-                📋
-              </button>
-              <button
-                on:click|stopPropagation={() => handleDelete(item)}
-                class="text-gray-400 hover:text-red-400 px-1"
-                title="Delete"
-              >
-                🗑
+                ✕
               </button>
             </div>
-          {/if}
-        </div>
-      {/each}
+          {/each}
+        {:else}
+          <div class="flex flex-col items-center justify-center h-32 text-gray-500 text-sm">
+            <span class="mb-2">📂</span>
+            <span>未选择工作区</span>
+            <span class="text-xs mt-1">点击上方按钮选择</span>
+          </div>
+        {/if}
+      {/if}
     </div>
   </div>
 </div>
