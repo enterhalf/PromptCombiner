@@ -54,7 +54,6 @@
 
     const newOrder = outlineItems.map((item) => item.id);
     appStore.setCurrentFile({
-      name: currentFile.name,
       order: newOrder,
       text_boxes: currentFile.text_boxes,
       variants: currentFile.variants,

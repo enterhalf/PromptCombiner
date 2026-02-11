@@ -30,7 +30,6 @@ pub struct Separator {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PromptFile {
-    pub name: String,
     pub order: Vec<String>,
     pub text_boxes: std::collections::HashMap<String, TextBox>,
     pub variants: std::collections::HashMap<String, VariantData>,
@@ -99,7 +98,6 @@ fn create_prompt_file(workspace_path: String, name: String) -> Result<String, St
     let file_path = Path::new(&workspace_path).join(&file_name);
 
     let prompt_file = PromptFile {
-        name: file_name.clone(),
         order: vec![],
         text_boxes: std::collections::HashMap::new(),
         variants: std::collections::HashMap::new(),

@@ -38,7 +38,6 @@
     };
 
     appStore.setCurrentFile({
-      name: currentFile.name,
       order: [...currentFile.order, newId],
       text_boxes: { ...currentFile.text_boxes, [newId]: newTextBox },
       variants: {
@@ -58,7 +57,6 @@
 
     const { textBox } = e.detail;
     appStore.setCurrentFile({
-      name: currentFile.name,
       order: currentFile.order,
       text_boxes: { ...currentFile.text_boxes, [textBox.id]: textBox },
       variants: currentFile.variants,
@@ -71,7 +69,6 @@
 
     const { id, variantData } = e.detail;
     appStore.setCurrentFile({
-      name: currentFile.name,
       order: currentFile.order,
       text_boxes: currentFile.text_boxes,
       variants: { ...currentFile.variants, [id]: variantData },
@@ -86,7 +83,6 @@
     const variantData = currentFile.variants[id];
     if (variantData) {
       appStore.setCurrentFile({
-        name: currentFile.name,
         order: currentFile.order,
         text_boxes: currentFile.text_boxes,
         variants: {
@@ -109,7 +105,6 @@
     delete newVariants[id];
 
     appStore.setCurrentFile({
-      name: currentFile.name,
       order: newOrder,
       text_boxes: newTextBoxes,
       variants: newVariants,
@@ -130,7 +125,6 @@
 
     const newOrder = textBoxList.map((item) => item.id);
     appStore.setCurrentFile({
-      name: currentFile.name,
       order: newOrder,
       text_boxes: currentFile.text_boxes,
       variants: currentFile.variants,
@@ -139,10 +133,11 @@
   }
 
   async function handleSave() {
-    if (!currentFile || !$appStore.workspacePath) return;
+    if (!currentFile || !$appStore.workspacePath || !$appStore.currentFileName)
+      return;
 
     try {
-      const filePath = `${$appStore.workspacePath}/${currentFile.name}`;
+      const filePath = `${$appStore.workspacePath}/${$appStore.currentFileName}`;
       await savePromptFile(filePath, currentFile);
       alert("File saved successfully!");
     } catch (error) {
@@ -220,7 +215,7 @@
       <div
         class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-center justify-between"
       >
-        <h2 class="text-white font-bold">{currentFile.name}</h2>
+        <h2 class="text-white font-bold">{$appStore.currentFileName}</h2>
       </div>
 
       <div class="flex-1 overflow-y-auto p-4">

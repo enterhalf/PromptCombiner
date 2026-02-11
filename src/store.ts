@@ -5,6 +5,7 @@ import { savePromptFile } from "./tauri-api";
 const defaultState: AppState = {
   workspacePath: "",
   currentFile: null,
+  currentFileName: "",
   workspaceItems: [],
   activeTab: "files",
   generatedText: "",
@@ -18,9 +19,9 @@ function createAppStore() {
 
   async function autoSave() {
     const state = get(appStore);
-    if (state.currentFile && state.workspacePath) {
+    if (state.currentFile && state.workspacePath && state.currentFileName) {
       try {
-        const filePath = `${state.workspacePath}/${state.currentFile.name}`;
+        const filePath = `${state.workspacePath}/${state.currentFileName}`;
         await savePromptFile(filePath, state.currentFile);
       } catch (error) {
         console.error("Auto-save failed:", error);
@@ -39,9 +40,9 @@ function createAppStore() {
 
   async function saveCurrentFile() {
     const state = get(appStore);
-    if (state.currentFile && state.workspacePath) {
+    if (state.currentFile && state.workspacePath && state.currentFileName) {
       try {
-        const filePath = `${state.workspacePath}/${state.currentFile.name}`;
+        const filePath = `${state.workspacePath}/${state.currentFileName}`;
         await savePromptFile(filePath, state.currentFile);
         return true;
       } catch (error) {
@@ -56,10 +57,16 @@ function createAppStore() {
     subscribe,
     setWorkspacePath: (path: string) =>
       update((s) => ({ ...s, workspacePath: path })),
-    setCurrentFile: (file: PromptFile | null) => {
-      update((s) => ({ ...s, currentFile: file }));
+    setCurrentFile: (file: PromptFile | null, fileName?: string) => {
+      update((s) => ({
+        ...s,
+        currentFile: file,
+        currentFileName: fileName !== undefined ? fileName : s.currentFileName,
+      }));
       triggerAutoSave();
     },
+    setCurrentFileName: (fileName: string) =>
+      update((s) => ({ ...s, currentFileName: fileName })),
     setWorkspaceItems: (items: WorkspaceItem[]) =>
       update((s) => ({ ...s, workspaceItems: items })),
     setActiveTab: (tab: "files" | "workbench") =>

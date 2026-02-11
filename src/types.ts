@@ -15,7 +15,6 @@ export interface VariantData {
 }
 
 export interface PromptFile {
-  name: string;
   order: string[];
   variants: Record<string, VariantData>;
   text_boxes: Record<string, TextBox>;
@@ -36,6 +35,7 @@ export interface WorkspaceItem {
 export interface AppState {
   workspacePath: string;
   currentFile: PromptFile | null;
+  currentFileName: string;
   workspaceItems: WorkspaceItem[];
   activeTab: "files" | "workbench";
   generatedText: string;

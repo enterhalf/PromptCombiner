@@ -74,7 +74,7 @@
 
         const promptFile = await loadPromptFile(item.path);
 
-        appStore.setCurrentFile(promptFile);
+        appStore.setCurrentFile(promptFile, item.name);
       } catch (error) {
         console.error("Failed to load file:", error);
         alert("Failed to load file");
@@ -233,7 +233,7 @@
           role="button"
           tabindex="0"
           on:click={() => handleOpenFile(item)}
-          on:keydown={(e) => e.key === 'Enter' && handleOpenFile(item)}
+          on:keydown={(e) => e.key === "Enter" && handleOpenFile(item)}
         >
           <div class="flex items-center flex-1 min-w-0">
             <span class="mr-2">
