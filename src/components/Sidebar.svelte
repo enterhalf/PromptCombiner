@@ -112,7 +112,8 @@
 
         const promptFile = await loadPromptFile(item.path);
 
-        appStore.setCurrentFile(promptFile, item.name);
+        // 打开新文件时重置历史记录并设置初始状态
+        appStore.setCurrentFile(promptFile, item.name, true);
       } catch (error) {
         console.error("Failed to load file:", error);
         alert("Failed to load file");

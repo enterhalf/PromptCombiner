@@ -1,12 +1,14 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
-  import { appStore } from "./store";
+  import { appStore, historyManager } from "./store";
   import { savePromptFile } from "./tauri-api";
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
   import type { TextBox as TextBoxType, Variant, BoxType } from "./types";
 
   $: currentFile = $appStore.currentFile;
+  $: canUndo = $historyManager.past.length > 0;
+  $: canRedo = $historyManager.future.length > 0;
 
   // 用于 dnd-zone 的列表
   $: textBoxList = currentFile
@@ -215,7 +217,29 @@
 
     return result;
   }
+
+  // 键盘快捷键处理
+  function handleKeyDown(e: KeyboardEvent) {
+    // 如果正在输入文本，不处理快捷键
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    // Ctrl+Z 撤销
+    if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+      e.preventDefault();
+      appStore.undo();
+    }
+
+    // Ctrl+Y 或 Ctrl+Shift+Z 重做
+    if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+      e.preventDefault();
+      appStore.redo();
+    }
+  }
 </script>
+
+<svelte:window on:keydown={handleKeyDown} />
 
 <div class="flex h-screen bg-gray-900">
   <Sidebar />
@@ -225,7 +249,31 @@
       <div
         class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-center justify-between"
       >
-        <h2 class="text-white font-bold">{$appStore.currentFileName}</h2>
+        <div class="flex items-center gap-3">
+          <h2 class="text-white font-bold">{$appStore.currentFileName}</h2>
+          <div class="flex items-center gap-1">
+            <button
+              on:click={() => appStore.undo()}
+              disabled={!canUndo}
+              class="px-2 py-1 rounded text-sm transition-colors {canUndo
+                ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                : 'text-gray-600 cursor-not-allowed'}"
+              title="Undo (Ctrl+Z)"
+            >
+              ←
+            </button>
+            <button
+              on:click={() => appStore.redo()}
+              disabled={!canRedo}
+              class="px-2 py-1 rounded text-sm transition-colors {canRedo
+                ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                : 'text-gray-600 cursor-not-allowed'}"
+              title="Redo (Ctrl+Y)"
+            >
+              →
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="flex-1 overflow-y-auto p-4">

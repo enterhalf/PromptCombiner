@@ -4,6 +4,7 @@ import { savePromptFile } from "./tauri-api";
 
 const RECENT_WORKSPACES_KEY = "prompt-combiner-recent-workspaces";
 const MAX_RECENT_WORKSPACES = 10;
+const MAX_HISTORY_STEPS = 64;
 
 function getStoredRecentWorkspaces(): string[] {
   if (typeof window === "undefined") return [];
@@ -36,6 +37,92 @@ const defaultState: AppState = {
 };
 
 let autoSaveTimeout: number | null = null;
+
+// 历史记录管理
+interface HistoryState {
+  past: PromptFile[];
+  present: PromptFile | null;
+  future: PromptFile[];
+}
+
+function createHistoryManager() {
+  const { subscribe, set, update } = writable<HistoryState>({
+    past: [],
+    present: null,
+    future: [],
+  });
+
+  return {
+    subscribe,
+    push: (newPresent: PromptFile) => {
+      update((state) => {
+        // 如果新状态和当前状态相同，不添加历史记录
+        if (JSON.stringify(state.present) === JSON.stringify(newPresent)) {
+          return state;
+        }
+        const newPast = state.present
+          ? [...state.past, state.present].slice(-MAX_HISTORY_STEPS)
+          : state.past;
+        return {
+          past: newPast,
+          present: newPresent,
+          future: [],
+        };
+      });
+    },
+    undo: (): PromptFile | null => {
+      let result: PromptFile | null = null;
+      update((state) => {
+        if (state.past.length === 0) return state;
+        const previous = state.past[state.past.length - 1];
+        const newPast = state.past.slice(0, -1);
+        result = previous;
+        return {
+          past: newPast,
+          present: previous,
+          future: state.present
+            ? [state.present, ...state.future]
+            : state.future,
+        };
+      });
+      return result;
+    },
+    redo: (): PromptFile | null => {
+      let result: PromptFile | null = null;
+      update((state) => {
+        if (state.future.length === 0) return state;
+        const next = state.future[0];
+        const newFuture = state.future.slice(1);
+        result = next;
+        return {
+          past: state.present ? [...state.past, state.present] : state.past,
+          present: next,
+          future: newFuture,
+        };
+      });
+      return result;
+    },
+    canUndo: () => {
+      const state = get({ subscribe });
+      return state.past.length > 0;
+    },
+    canRedo: () => {
+      const state = get({ subscribe });
+      return state.future.length > 0;
+    },
+    reset: () => {
+      set({ past: [], present: null, future: [] });
+    },
+    setPresent: (present: PromptFile | null) => {
+      update((state) => ({
+        ...state,
+        present,
+      }));
+    },
+  };
+}
+
+export const historyManager = createHistoryManager();
 
 function createAppStore() {
   const { subscribe, set, update } = writable<AppState>(defaultState);
@@ -95,13 +182,47 @@ function createAppStore() {
         };
       });
     },
-    setCurrentFile: (file: PromptFile | null, fileName?: string) => {
+    setCurrentFile: (
+      file: PromptFile | null,
+      fileName?: string,
+      skipHistory = false
+    ) => {
       update((s) => ({
         ...s,
         currentFile: file,
         currentFileName: fileName !== undefined ? fileName : s.currentFileName,
       }));
+      // 记录历史（除非是撤销/重做操作或初始化）
+      if (file && !skipHistory) {
+        historyManager.push(file);
+      } else if (file === null) {
+        historyManager.reset();
+      }
       triggerAutoSave();
+    },
+    undo: () => {
+      const previousState = historyManager.undo();
+      if (previousState) {
+        update((s) => ({
+          ...s,
+          currentFile: previousState,
+        }));
+        triggerAutoSave();
+        return true;
+      }
+      return false;
+    },
+    redo: () => {
+      const nextState = historyManager.redo();
+      if (nextState) {
+        update((s) => ({
+          ...s,
+          currentFile: nextState,
+        }));
+        triggerAutoSave();
+        return true;
+      }
+      return false;
     },
     setCurrentFileName: (fileName: string) =>
       update((s) => ({ ...s, currentFileName: fileName })),
