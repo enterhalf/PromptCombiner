@@ -1,8 +1,9 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import type { FileBox, FileBoxData, FileBoxItem } from "../types";
   import { open } from "@tauri-apps/api/dialog";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
   export let fileBox: FileBox;
   export let index: number | undefined = undefined;
@@ -18,6 +19,11 @@
   let isEditingPathSegments = false;
   let titleInput: HTMLInputElement;
   let isEditingTitle = false;
+  let dropZoneElement: HTMLDivElement;
+  let unlistenFileDrop: UnlistenFn | null = null;
+  let unlistenFileDropHover: UnlistenFn | null = null;
+  let unlistenFileDropCancelled: UnlistenFn | null = null;
+  let isDragOver = false;
 
   $: height = fileBoxData.height;
   $: pathSegments = fileBoxData.path_segments;
@@ -364,17 +370,80 @@
       : fileBox.mode === "disabled"
         ? "bg-gray-800"
         : "bg-purple-800";
+
+  // 检查点是否在元素内
+  function isPointInElement(
+    x: number,
+    y: number,
+    element: HTMLElement
+  ): boolean {
+    const rect = element.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  // Tauri v1 文件拖放事件处理
+  onMount(async () => {
+    try {
+      // 监听 tauri://file-drop-hover 事件（拖拽悬停）
+      // Tauri v1 中 payload 直接是路径数组
+      unlistenFileDropHover = await listen<string[]>("tauri://file-drop-hover", (event) => {
+        // 当有文件悬停时显示高亮
+        isDragOver = true;
+      });
+
+      // 监听 tauri://file-drop-cancelled 事件（拖拽取消）
+      unlistenFileDropCancelled = await listen("tauri://file-drop-cancelled", () => {
+        isDragOver = false;
+      });
+
+      // 监听 tauri://file-drop 事件（文件拖放完成）
+      // Tauri v1 中 payload 直接是路径数组 string[]
+      unlistenFileDrop = await listen<string[]>("tauri://file-drop", (event) => {
+        isDragOver = false;
+
+        // 获取拖放的文件路径
+        const droppedFiles = event.payload;
+        if (droppedFiles && droppedFiles.length > 0) {
+          const newFiles: FileBoxItem[] = droppedFiles.map((path) => ({
+            id: generateId(),
+            path,
+            checked: true,
+          }));
+
+          dispatch("datachange", {
+            id: fileBox.id,
+            fileBoxData: { ...fileBoxData, files: [...files, ...newFiles] },
+          });
+        }
+      });
+    } catch (error) {
+      console.error("Failed to setup file drop listener:", error);
+    }
+  });
+
+  onDestroy(() => {
+    if (unlistenFileDrop) {
+      unlistenFileDrop();
+    }
+    if (unlistenFileDropHover) {
+      unlistenFileDropHover();
+    }
+    if (unlistenFileDropCancelled) {
+      unlistenFileDropCancelled();
+    }
+  });
 </script>
 
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
 
 <div
+  bind:this={dropZoneElement}
   class="flex flex-col bg-gray-800 rounded-lg mb-2 overflow-hidden relative {isDragging
     ? 'opacity-50'
+    : ''} {isDragOver
+    ? 'ring-2 ring-blue-500 ring-opacity-50'
     : ''}"
   style="height: {height}px;"
-  on:dragover={handleDragOver}
-  on:drop={handleDrop}
   role="region"
   aria-label="File box drop zone"
 >
