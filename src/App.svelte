@@ -411,7 +411,8 @@
     try {
       const webview = getCurrentWebviewWindow();
       unlistenFileDrop = await webview.onDragDropEvent((event) => {
-        const { type, paths, position } = event.payload;
+        const payload = event.payload as { type: string; paths?: string[]; position?: { x: number; y: number } };
+        const { type, paths, position } = payload;
         console.log("[App] Tauri v2 file drop event:", type, paths, position);
 
         if (type === "over") {
@@ -453,7 +454,7 @@
             }
           }
           hoveredFileBoxId = null;
-        } else if (type === "cancel") {
+        } else if (type === "leave" || type === "cancel") {
           hoveredFileBoxId = null;
         }
       });

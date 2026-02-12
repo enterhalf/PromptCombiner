@@ -1,8 +1,9 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import type { FileBox, FileBoxData, FileBoxItem } from "../types";
   import { open } from "@tauri-apps/plugin-dialog";
+  import { getCurrentWebview } from "@tauri-apps/api/webview";
 
   export let fileBox: FileBox;
   export let index: number | undefined = undefined;
@@ -21,6 +22,7 @@
   let isDragOverDropZone = false;
   let fileInputElement: HTMLInputElement;
   let dropZoneElement: HTMLDivElement;
+  let unlistenDragDrop: (() => void) | null = null;
 
   $: height = fileBoxData.height;
   $: pathSegments = fileBoxData.path_segments;
@@ -288,7 +290,7 @@
     }
   }
 
-  function handleDropZoneDrop(e: DragEvent) {
+  async function handleDropZoneDrop(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     isDragOverDropZone = false;
@@ -296,19 +298,26 @@
 
     const droppedFiles: string[] = [];
 
+    // 首先尝试使用 Tauri v2 的 API 获取文件路径
+    // 在 Tauri v2 中，拖拽文件时会触发 onDragDropEvent，但我们也需要处理 HTML5 拖拽
     if (e.dataTransfer) {
       console.log("[FileBox] dataTransfer available, types:", e.dataTransfer.types);
       console.log("[FileBox] files count:", e.dataTransfer.files?.length);
       console.log("[FileBox] items count:", e.dataTransfer.items?.length);
 
-      // 尝试从 dataTransfer 获取文件路径（Tauri 桌面环境）
+      // 在 Tauri v2 Windows 版本中，文件路径可以通过 dataTransfer.files 获取
+      // 但需要检查是否有 path 属性（Tauri 提供的完整路径）
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         for (let i = 0; i < e.dataTransfer.files.length; i++) {
           const file = e.dataTransfer.files[i];
-          const path = (file as any).path || file.name;
-          console.log("[FileBox] File from dataTransfer.files:", file.name, "path:", (file as any).path);
-          if (path) {
+          // Tauri v2 在 Windows 上会在 File 对象上添加 path 属性
+          const path = (file as any).path;
+          console.log("[FileBox] File from dataTransfer.files:", file.name, "path:", path);
+          if (path && typeof path === 'string') {
             droppedFiles.push(path);
+          } else {
+            // 如果没有 path 属性，使用文件名（相对路径）
+            droppedFiles.push(file.name);
           }
         }
       }
@@ -320,10 +329,12 @@
           if (item.kind === "file") {
             const file = item.getAsFile();
             if (file) {
-              const path = (file as any).path || file.name;
-              console.log("[FileBox] File from dataTransfer.items:", file.name, "path:", (file as any).path);
-              if (path) {
+              const path = (file as any).path;
+              console.log("[FileBox] File from dataTransfer.items:", file.name, "path:", path);
+              if (path && typeof path === 'string') {
                 droppedFiles.push(path);
+              } else {
+                droppedFiles.push(file.name);
               }
             }
           }
@@ -419,6 +430,31 @@
       : fileBox.mode === "disabled"
         ? "bg-gray-800"
         : "bg-purple-800";
+
+  // 使用 Tauri v2 的拖拽事件监听
+  onMount(async () => {
+    try {
+      const webview = getCurrentWebview();
+      unlistenDragDrop = await webview.onDragDropEvent((event) => {
+        if (event.payload.type === 'drop') {
+          const paths = event.payload.paths;
+          console.log('[FileBox] Tauri drop event:', paths);
+          
+          // 检查拖拽是否发生在当前 FileBox 的 dropZone 区域内
+          // 由于 Tauri 的拖拽事件是全局的，我们需要结合 HTML5 拖拽事件来处理
+          // 这里只是记录日志，实际处理在 handleDropZoneDrop 中
+        }
+      });
+    } catch (error) {
+      console.error('[FileBox] Failed to setup drag drop listener:', error);
+    }
+  });
+
+  onDestroy(() => {
+    if (unlistenDragDrop) {
+      unlistenDragDrop();
+    }
+  });
 </script>
 
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
