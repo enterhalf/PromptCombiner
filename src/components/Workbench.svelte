@@ -1,37 +1,56 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
   import { appStore } from "../store";
-  import type { PromptFile } from "../types";
+  import type { PromptFile, FileBoxItem } from "../types";
+  import { readFileContent } from "../tauri-api";
 
   export let currentFile: PromptFile;
 
   // 用于 dnd-zone 的列表
-  $: outlineItems = currentFile.order.map((textBoxId, index) => {
-    const tb = currentFile.text_boxes[textBoxId];
-    const variantData = currentFile.variants[textBoxId];
-    const currentVariantIndex = variantData?.current_variant_index || 0;
-    const currentVariant = variantData?.variants?.[currentVariantIndex];
-    const title =
-      currentVariant?.title ||
-      currentVariant?.content?.substring(0, 20) ||
-      `Text Box ${index + 1}`;
+  $: outlineItems = currentFile.order.map((boxId, index) => {
+    const textBox = currentFile.text_boxes[boxId];
+    const fileBox = currentFile.file_boxes?.[boxId];
+    
+    if (textBox) {
+      const variantData = currentFile.variants[boxId];
+      const currentVariantIndex = variantData?.current_variant_index || 0;
+      const currentVariant = variantData?.variants?.[currentVariantIndex];
+      const title =
+        currentVariant?.title ||
+        currentVariant?.content?.substring(0, 20) ||
+        `Text Box ${index + 1}`;
+      return {
+        id: boxId,
+        title: title,
+        type: "text" as const,
+      };
+    } else if (fileBox) {
+      const fileBoxData = currentFile.file_box_data?.[boxId];
+      const fileCount = fileBoxData?.files?.length || 0;
+      const checkedCount = fileBoxData?.files?.filter((f: FileBoxItem) => f.checked).length || 0;
+      return {
+        id: boxId,
+        title: `File Box (${checkedCount}/${fileCount} files)`,
+        type: "file" as const,
+      };
+    }
     return {
-      id: textBoxId,
-      title: title,
-      type: "textbox" as const,
+      id: boxId,
+      title: `Unknown ${index + 1}`,
+      type: "unknown" as const,
     };
   });
 
-  function handleGenerate() {
+  async function handleGenerate() {
     if (!currentFile) return;
 
-    const generated = generatePreview();
+    const generated = await generatePreview();
     appStore.setGeneratedText(generated);
     appStore.setShowGeneratedModal(true);
   }
 
   async function handleGenerateAndCopy() {
-    handleGenerate();
+    await handleGenerate();
 
     if ($appStore.generatedText) {
       try {
@@ -56,6 +75,8 @@
     appStore.setCurrentFile({
       order: newOrder,
       text_boxes: currentFile.text_boxes,
+      file_boxes: currentFile.file_boxes,
+      file_box_data: currentFile.file_box_data,
       variants: currentFile.variants,
       separators: currentFile.separators,
     });
@@ -68,16 +89,82 @@
     }
   }
 
-  function generatePreview() {
+  // 获取显示的路径（根据 path_segments 截断）
+  function getDisplayPath(fullPath: string, pathSegments: number): string {
+    if (!fullPath) return "";
+    if (pathSegments < 1) return fullPath;
+    
+    // 统一使用正斜杠处理路径
+    const normalizedPath = fullPath.replace(/\\/g, '/');
+    const parts = normalizedPath.split('/').filter(p => p.length > 0);
+    
+    if (parts.length <= pathSegments) return fullPath;
+    
+    // 保留最后 pathSegments 个分段
+    const displayParts = parts.slice(-pathSegments);
+    return displayParts.join('/');
+  }
+
+  // 获取文件扩展名用于代码块语言标识
+  function getFileExtension(filePath: string): string {
+    if (!filePath) return "";
+    const parts = filePath.split('.');
+    if (parts.length > 1) {
+      return parts[parts.length - 1].toLowerCase();
+    }
+    return "";
+  }
+
+  async function generateFileBoxContent(fileBoxId: string): Promise<string> {
+    const fileBox = currentFile.file_boxes?.[fileBoxId];
+    const fileBoxData = currentFile.file_box_data?.[fileBoxId];
+    
+    if (!fileBox || !fileBoxData || fileBox.mode === "disabled" || fileBox.mode === "shadow") {
+      return "";
+    }
+
+    const pathSegments = fileBoxData.path_segments || 2;
+    const checkedFiles = fileBoxData.files?.filter((f: FileBoxItem) => f.checked) || [];
+    
+    if (checkedFiles.length === 0) return "";
+
+    let result = "";
+    
+    for (const file of checkedFiles) {
+      if (!file.path) continue;
+      
+      try {
+        const content = await readFileContent(file.path);
+        const displayPath = getDisplayPath(file.path, pathSegments);
+        const ext = getFileExtension(file.path);
+        
+        result += `### ${displayPath}\n`;
+        result += "\`\`\`" + ext + "\n";
+        result += content;
+        result += "\n\`\`\`\n\n";
+      } catch (error) {
+        console.error(`Failed to read file ${file.path}:`, error);
+        const displayPath = getDisplayPath(file.path, pathSegments);
+        result += `### ${displayPath}\n`;
+        result += "\`\`\`\n";
+        result += `[Error reading file: ${error}]`;
+        result += "\n\`\`\`\n\n";
+      }
+    }
+    
+    return result.trim();
+  }
+
+  async function generatePreview(): Promise<string> {
     if (!currentFile) return "";
 
     let result = "";
     let shadowVars = new Map();
 
+    // 收集 Shadow 模式的变量
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const variantData = currentFile.variants[tb.id];
-        // 收集所有变体的变量，而不仅仅是当前激活的变体
         variantData?.variants?.forEach((variant) => {
           const varName =
             variant.title.trim().toLowerCase().replace(/\s+/g, "_") || "";
@@ -92,26 +179,34 @@
     let lastSeparator = "\n\n";
     let isFirstContent = true;
 
-    currentFile.order.forEach((textBoxId) => {
-      const tb = currentFile.text_boxes[textBoxId];
-      if (!tb || tb.mode === "disabled" || tb.mode === "shadow") return;
+    for (const boxId of currentFile.order) {
+      const textBox = currentFile.text_boxes[boxId];
+      const fileBox = currentFile.file_boxes?.[boxId];
+      
+      let content = "";
+      
+      if (textBox && textBox.mode !== "disabled" && textBox.mode !== "shadow") {
+        const variantData = currentFile.variants[boxId];
+        const currentVariantIndex = variantData?.current_variant_index || 0;
+        content = variantData?.variants?.[currentVariantIndex]?.content || "";
+        
+        // 替换 Shadow 变量
+        shadowVars.forEach((value, key) => {
+          const placeholder = `{{${key}}}`;
+          content = content.replace(new RegExp(placeholder, "g"), value);
+        });
+      } else if (fileBox && fileBox.mode !== "disabled" && fileBox.mode !== "shadow") {
+        content = await generateFileBoxContent(boxId);
+      }
+      
+      if (!content) continue;
 
       if (!isFirstContent) {
         result += lastSeparator;
       }
       isFirstContent = false;
-
-      const variantData = currentFile.variants[textBoxId];
-      const currentVariantIndex = variantData?.current_variant_index || 0;
-      let content = variantData?.variants?.[currentVariantIndex]?.content || "";
-
-      shadowVars.forEach((value, key) => {
-        const placeholder = `{{${key}}}`;
-        content = content.replace(new RegExp(placeholder, "g"), value);
-      });
-
       result += content;
-    });
+    }
 
     return result;
   }
@@ -153,7 +248,13 @@
         <span class="mr-2 text-gray-400 cursor-grab active:cursor-grabbing"
           >☰</span
         >
-        <span class="mr-2">📝</span>
+        {#if item.type === "text"}
+          <span class="mr-2">📝</span>
+        {:else if item.type === "file"}
+          <span class="mr-2">📁</span>
+        {:else}
+          <span class="mr-2">❓</span>
+        {/if}
         <span
           class="text-gray-300 text-sm truncate flex-1 cursor-pointer"
           role="button"

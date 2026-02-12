@@ -1,6 +1,27 @@
 export interface TextBox {
   id: string;
   mode: "normal" | "disabled" | "shadow";
+  type?: "text";  // 默认为 text
+}
+
+export interface FileBox {
+  id: string;
+  mode: "normal" | "disabled" | "shadow";
+  type: "file";
+}
+
+// 文件框中的一行文件项
+export interface FileBoxItem {
+  id: string;
+  path: string;
+  checked: boolean;
+}
+
+// 文件框的数据
+export interface FileBoxData {
+  height: number;
+  path_segments: number;  // 保留的路径分段数，默认2，小于1表示显示完整路径
+  files: FileBoxItem[];
 }
 
 export interface Variant {
@@ -18,6 +39,8 @@ export interface PromptFile {
   order: string[];
   variants: Record<string, VariantData>;
   text_boxes: Record<string, TextBox>;
+  file_boxes: Record<string, FileBox>;  // 文件框数据
+  file_box_data: Record<string, FileBoxData>;  // 文件框的文件列表数据
   separators: Separator[];
 }
 

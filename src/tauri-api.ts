@@ -21,7 +21,15 @@ export async function createPromptFile(workspacePath: string, name: string): Pro
 
 export async function loadPromptFile(filePath: string): Promise<PromptFile> {
   try {
-    return await invoke('load_prompt_file', { filePath });
+    const data = await invoke('load_prompt_file', { filePath }) as PromptFile;
+    // 确保新字段存在
+    if (!data.file_boxes) {
+      data.file_boxes = {};
+    }
+    if (!data.file_box_data) {
+      data.file_box_data = {};
+    }
+    return data;
   } catch (error) {
     console.error('Failed to load prompt file:', error);
     throw error;
@@ -69,6 +77,15 @@ export async function generateContext(promptFile: PromptFile): Promise<string> {
     return await invoke('generate_context', { promptFile });
   } catch (error) {
     console.error('Failed to generate context:', error);
+    throw error;
+  }
+}
+
+export async function readFileContent(filePath: string): Promise<string> {
+  try {
+    return await invoke('read_file', { filePath });
+  } catch (error) {
+    console.error('Failed to read file:', error);
     throw error;
   }
 }
