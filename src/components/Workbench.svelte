@@ -115,11 +115,12 @@
     return "";
   }
 
-  async function generateFileBoxContent(fileBoxId: string): Promise<string> {
+  async function generateFileBoxContent(fileBoxId: string, isForShadow: boolean = false): Promise<string> {
     const fileBox = currentFile.file_boxes?.[fileBoxId];
     const fileBoxData = currentFile.file_box_data?.[fileBoxId];
     
-    if (!fileBox || !fileBoxData || fileBox.mode === "disabled" || fileBox.mode === "shadow") {
+    // 如果是用于 shadow 变量收集，不检查 shadow 模式；否则正常检查
+    if (!fileBox || !fileBoxData || fileBox.mode === "disabled" || (!isForShadow && fileBox.mode === "shadow")) {
       return "";
     }
 
@@ -176,25 +177,30 @@
       }
     });
 
-    // 收集 FileBox Shadow 模式的变量
+    // 收集 FileBox Shadow 模式的变量（使用 await 确保异步完成）
+    const fileBoxShadowPromises: Promise<void>[] = [];
     Object.entries(currentFile.file_boxes || {}).forEach(([fileBoxId, fileBox]) => {
       if (fileBox.mode === "shadow") {
         const fileBoxData = currentFile.file_box_data?.[fileBoxId];
         if (fileBoxData) {
           const varName = fileBoxData.title?.trim().toLowerCase().replace(/\s+/g, "_") || "";
           if (varName) {
-            // 生成 FileBox 内容作为变量值
-            generateFileBoxContent(fileBoxId).then(content => {
+            // 生成 FileBox 内容作为变量值（传入 true 表示用于 shadow 变量）
+            const promise = generateFileBoxContent(fileBoxId, true).then(content => {
               if (content) {
                 shadowVars.set(varName, content);
               }
             }).catch(e => {
               console.error("Error generating file box shadow content:", e);
             });
+            fileBoxShadowPromises.push(promise);
           }
         }
       }
     });
+
+    // 等待所有 FileBox shadow 变量收集完成
+    await Promise.all(fileBoxShadowPromises);
 
     let lastSeparator = "\n\n";
     let isFirstContent = true;
