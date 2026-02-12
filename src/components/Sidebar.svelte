@@ -23,7 +23,9 @@
   let showCopyDialog = false;
   let copyItem: WorkspaceItem | null = null;
   let copyName = "";
-  let isTauriEnv = typeof window !== "undefined" && "__TAURI__" in window;
+  // Tauri v2 检测：检查 window.__TAURI_INTERNALS__ 是否存在
+  let isTauriEnv =
+    typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
   // 高度调整相关
   let filesHeight = 50; // 百分比
@@ -203,7 +205,9 @@
     isResizing = true;
     startY = e.clientY;
     startHeight = filesHeight;
-    const sidebar = (e.target as HTMLElement).closest('.sidebar-container') as HTMLElement;
+    const sidebar = (e.target as HTMLElement).closest(
+      ".sidebar-container"
+    ) as HTMLElement;
     if (sidebar) {
       sidebarHeight = sidebar.clientHeight;
     }
@@ -229,7 +233,9 @@
 
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
 
-<div class="w-64 bg-gray-900 border-r border-gray-700 flex flex-col h-full sidebar-container">
+<div
+  class="w-64 bg-gray-900 border-r border-gray-700 flex flex-col h-full sidebar-container"
+>
   <div class="p-4 border-b border-gray-700">
     <h1 class="text-white text-lg font-bold">Prompt Combiner</h1>
   </div>
@@ -246,7 +252,9 @@
       {#if $appStore.currentFile}
         <Workbench currentFile={$appStore.currentFile} />
       {:else}
-        <div class="flex items-center justify-center h-full text-gray-500 text-sm">
+        <div
+          class="flex items-center justify-center h-full text-gray-500 text-sm"
+        >
           Open a file to see workbench
         </div>
       {/if}
@@ -264,20 +272,20 @@
   </div>
 
   <!-- Files 区域 -->
-  <div
-    class="flex-1 flex flex-col overflow-hidden"
-  >
+  <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Files 标题栏 + 工作区选择按钮 -->
     <div class="px-3 py-2 bg-gray-800 border-b border-gray-700">
       <div class="flex items-center justify-between mb-2">
         <h2 class="text-white font-medium text-sm">Files</h2>
       </div>
-      
+
       <!-- 工作区选择按钮 - 显示当前路径或提示文字 -->
       <div class="relative">
         <button
           on:click={handleSelectWorkspace}
-          class="w-full text-left px-2 py-1.5 rounded text-xs transition-colors border pr-7 {workspacePath ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600' : 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700'}"
+          class="w-full text-left px-2 py-1.5 rounded text-xs transition-colors border pr-7 {workspacePath
+            ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600'
+            : 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700'}"
           disabled={!isTauriEnv}
           class:opacity-50={!isTauriEnv}
           class:cursor-not-allowed={!isTauriEnv}
@@ -373,7 +381,8 @@
               role="button"
               tabindex="0"
               on:click={() => handleSelectRecentWorkspace(recentPath)}
-              on:keydown={(e) => e.key === "Enter" && handleSelectRecentWorkspace(recentPath)}
+              on:keydown={(e) =>
+                e.key === "Enter" && handleSelectRecentWorkspace(recentPath)}
               title={recentPath}
             >
               <div class="flex items-center flex-1 min-w-0">
@@ -397,7 +406,9 @@
             </div>
           {/each}
         {:else}
-          <div class="flex flex-col items-center justify-center h-32 text-gray-500 text-sm">
+          <div
+            class="flex flex-col items-center justify-center h-32 text-gray-500 text-sm"
+          >
             <span class="mb-2">📂</span>
             <span>未选择工作区</span>
             <span class="text-xs mt-1">点击上方按钮选择</span>
