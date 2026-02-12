@@ -46,6 +46,7 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
 - **调整高度**：拖拽文本框底部边缘可以调整高度
 - **使用变量**：将文本框设置为"影子模式"，在其他文本框中使用 `{{变量名}}` 引用
 - **创建变体**：点击文本框右侧的"+"按钮创建变体，方便对比不同版本
+- **临时内容**：标题以 `!` 开头的文本框内容不会被保存
 
 ### ⌨️ 快捷键
 
@@ -100,6 +101,7 @@ We provide pre-built installation packages for Windows, macOS, and Linux.
 - **Resize**: Drag the bottom edge of text boxes to adjust height
 - **Use Variables**: Set text box to "Shadow" mode and use `{{variable_name}}` in other text boxes to reference it
 - **Create Variants**: Click the "+" button on the right side of text boxes to create variants for comparing different versions
+- **Temporary Content**: Text boxes with titles starting with `!` will not be saved
 
 ### ⌨️ Keyboard Shortcuts
 
