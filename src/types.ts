@@ -22,6 +22,7 @@ export interface FileBoxData {
   height: number;
   path_segments: number;  // 保留的路径分段数，默认2，小于1表示显示完整路径
   files: FileBoxItem[];
+  title: string;  // 文件框标题，用于 Shadow 模式
 }
 
 export interface Variant {

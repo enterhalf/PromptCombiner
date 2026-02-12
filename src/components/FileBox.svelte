@@ -16,10 +16,21 @@
   let startHeight = 0;
   let pathSegmentsInput: HTMLInputElement;
   let isEditingPathSegments = false;
+  let titleInput: HTMLInputElement;
+  let isEditingTitle = false;
 
   $: height = fileBoxData.height;
   $: pathSegments = fileBoxData.path_segments;
   $: files = fileBoxData.files || [];
+  $: title = fileBoxData.title || "";
+
+  // 获取显示的标题
+  function getDisplayTitle(): string {
+    if (title && title.trim()) {
+      return title.trim();
+    }
+    return "Untitled";
+  }
 
   // 用于 dnd-zone 的文件列表
   $: fileItems = files.map((file, idx) => ({
@@ -83,22 +94,22 @@
   function getDisplayPath(fullPath: string): string {
     if (!fullPath) return "";
     if (pathSegments < 1) return fullPath;
-    
+
     // 统一使用正斜杠处理路径
-    const normalizedPath = fullPath.replace(/\\/g, '/');
-    const parts = normalizedPath.split('/').filter(p => p.length > 0);
-    
+    const normalizedPath = fullPath.replace(/\\/g, "/");
+    const parts = normalizedPath.split("/").filter((p) => p.length > 0);
+
     if (parts.length <= pathSegments) return fullPath;
-    
+
     // 保留最后 pathSegments 个分段
     const displayParts = parts.slice(-pathSegments);
-    return displayParts.join('/');
+    return displayParts.join("/");
   }
 
   // 获取文件扩展名用于代码块语言标识
   function getFileExtension(filePath: string): string {
     if (!filePath) return "";
-    const parts = filePath.split('.');
+    const parts = filePath.split(".");
     if (parts.length > 1) {
       return parts[parts.length - 1].toLowerCase();
     }
@@ -106,7 +117,7 @@
   }
 
   function handleToggleCheck(fileId: string) {
-    const newFiles = files.map(f => 
+    const newFiles = files.map((f) =>
       f.id === fileId ? { ...f, checked: !f.checked } : f
     );
     dispatch("datachange", {
@@ -116,7 +127,7 @@
   }
 
   function handleDeleteFile(fileId: string) {
-    const newFiles = files.filter(f => f.id !== fileId);
+    const newFiles = files.filter((f) => f.id !== fileId);
     dispatch("datachange", {
       id: fileBox.id,
       fileBoxData: { ...fileBoxData, files: newFiles },
@@ -133,7 +144,7 @@
       if (selected && typeof selected === "string") {
         if (fileId) {
           // 更新现有文件路径
-          const newFiles = files.map(f => 
+          const newFiles = files.map((f) =>
             f.id === fileId ? { ...f, path: selected } : f
           );
           dispatch("datachange", {
@@ -155,12 +166,12 @@
       });
 
       if (selected && Array.isArray(selected) && selected.length > 0) {
-        const newFiles: FileBoxItem[] = selected.map(path => ({
+        const newFiles: FileBoxItem[] = selected.map((path) => ({
           id: generateId(),
           path,
           checked: true,
         }));
-        
+
         dispatch("datachange", {
           id: fileBox.id,
           fileBoxData: { ...fileBoxData, files: [...files, ...newFiles] },
@@ -178,7 +189,7 @@
 
   function handleFileDndFinalize(e: CustomEvent) {
     fileItems = e.detail.items;
-    const newFiles = fileItems.map(item => item.file);
+    const newFiles = fileItems.map((item) => item.file);
     dispatch("datachange", {
       id: fileBox.id,
       fileBoxData: { ...fileBoxData, files: newFiles },
@@ -218,6 +229,38 @@
     });
   }
 
+  // 标题编辑相关函数
+  function handleTitleClick() {
+    isEditingTitle = true;
+    setTimeout(() => {
+      if (titleInput) {
+        titleInput.focus();
+        titleInput.select();
+      }
+    }, 0);
+  }
+
+  function handleTitleBlur() {
+    isEditingTitle = false;
+  }
+
+  function handleTitleKeyDown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (titleInput) {
+        titleInput.blur();
+      }
+    }
+  }
+
+  function handleTitleInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    dispatch("datachange", {
+      id: fileBox.id,
+      fileBoxData: { ...fileBoxData, title: input.value },
+    });
+  }
+
   // 处理拖放文件到框体内
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
@@ -227,44 +270,87 @@
     }
   }
 
-  function handleDrop(e: DragEvent) {
+  async function handleDrop(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const droppedFiles: string[] = [];
-    
+
     if (e.dataTransfer) {
-      // 尝试从 dataTransfer 获取文件路径
-      const textData = e.dataTransfer.getData("text/plain");
-      if (textData) {
-        // 可能是从文件管理器拖入的路径
-        droppedFiles.push(...textData.split('\n').filter(p => p.trim()));
+      // 尝试从 dataTransfer 获取文件路径（Tauri 桌面环境）
+      // 在 Tauri 中，拖放的文件路径可以通过 dataTransfer.files 获取
+
+      // 首先尝试获取 files
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        for (let i = 0; i < e.dataTransfer.files.length; i++) {
+          const file = e.dataTransfer.files[i];
+          // 在 Tauri 中，可以通过 webkitRelativePath 或 path 获取完整路径
+          // 但浏览器安全限制通常不允许直接获取完整路径
+          // 我们需要使用 Tauri 的 API 来处理文件拖放
+
+          // 尝试获取路径 - 在 Tauri 环境中可能有特殊处理
+          const path = (file as any).path || file.name;
+          if (path) {
+            droppedFiles.push(path);
+          }
+        }
       }
-      
-      // 也尝试从 items 获取
-      if (e.dataTransfer.items) {
+
+      // 如果没有获取到文件，尝试从 items 获取
+      if (droppedFiles.length === 0 && e.dataTransfer.items) {
         for (let i = 0; i < e.dataTransfer.items.length; i++) {
           const item = e.dataTransfer.items[i];
           if (item.kind === "file") {
             const file = item.getAsFile();
             if (file) {
-              // 在 Tauri 环境中，我们需要使用 Web API 的 path
-              // 但由于浏览器安全限制，这里可能需要其他方式
-              // 暂时使用文件名作为占位
-              droppedFiles.push(file.name);
+              const path = (file as any).path || file.name;
+              if (path) {
+                droppedFiles.push(path);
+              }
+            }
+          }
+        }
+      }
+
+      // 尝试从 text/plain 获取（某些文件管理器会提供路径）
+      if (droppedFiles.length === 0) {
+        const textData = e.dataTransfer.getData("text/plain");
+        if (textData) {
+          droppedFiles.push(...textData.split("\n").filter((p) => p.trim()));
+        }
+      }
+
+      // 尝试从 text/uri-list 获取
+      if (droppedFiles.length === 0) {
+        const uriList = e.dataTransfer.getData("text/uri-list");
+        if (uriList) {
+          const uris = uriList
+            .split("\n")
+            .filter((p) => p.trim() && !p.startsWith("#"));
+          for (const uri of uris) {
+            // 将 file:// 协议转换为路径
+            if (uri.startsWith("file://")) {
+              let path = decodeURIComponent(uri.substring(7));
+              // Windows 路径处理
+              if (path.startsWith("/") && path[2] === ":") {
+                path = path.substring(1);
+              }
+              droppedFiles.push(path);
+            } else {
+              droppedFiles.push(uri);
             }
           }
         }
       }
     }
-    
+
     if (droppedFiles.length > 0) {
-      const newFiles: FileBoxItem[] = droppedFiles.map(path => ({
+      const newFiles: FileBoxItem[] = droppedFiles.map((path) => ({
         id: generateId(),
         path,
         checked: true,
       }));
-      
+
       dispatch("datachange", {
         id: fileBox.id,
         fileBoxData: { ...fileBoxData, files: [...files, ...newFiles] },
@@ -310,7 +396,33 @@
       >
         ☰
       </div>
-      <span class="font-medium text-white text-sm">📁 File Box</span>
+      <div class="relative w-24">
+        {#if !isEditingTitle}
+          <div
+            class="font-medium truncate px-1 rounded cursor-pointer hover:bg-gray-700 text-sm {title?.trim()
+              ? 'text-white'
+              : 'text-gray-400 italic'}"
+            role="button"
+            tabindex="0"
+            on:click={handleTitleClick}
+            on:keydown={(e) => e.key === "Enter" && handleTitleClick()}
+            title="Click to edit title"
+          >
+            {getDisplayTitle()}
+          </div>
+        {:else}
+          <input
+            type="text"
+            bind:this={titleInput}
+            value={title}
+            on:input={handleTitleInput}
+            on:blur={handleTitleBlur}
+            on:keydown={handleTitleKeyDown}
+            class="w-full bg-transparent font-medium truncate focus:outline-none focus:bg-gray-700 rounded px-1 text-white text-sm"
+            placeholder="Enter title..."
+          />
+        {/if}
+      </div>
     </div>
 
     <!-- 中间：路径分段参数 -->

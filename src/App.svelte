@@ -78,6 +78,7 @@
       height: 200,
       path_segments: 2,
       files: [],
+      title: "",
     };
 
     // 在指定位置插入新id

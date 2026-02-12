@@ -33,6 +33,7 @@ pub struct FileBoxData {
     pub height: u32,
     pub path_segments: i32,
     pub files: Vec<FileBoxItem>,
+    pub title: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -312,6 +313,32 @@ fn generate_context(prompt_file: PromptFile) -> Result<String, String> {
                     let var_name = variant.title.trim().to_lowercase().replace(' ', "_");
                     if !var_name.is_empty() {
                         shadow_vars.insert(var_name, variant.content.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // 收集 FileBox Shadow 变量
+    if let Some(file_boxes) = &prompt_file.file_boxes {
+        if let Some(file_box_data_map) = &prompt_file.file_box_data {
+            for (file_box_id, file_box) in file_boxes {
+                if file_box.mode == "shadow" {
+                    if let Some(file_box_data) = file_box_data_map.get(file_box_id) {
+                        let var_name = file_box_data.title.trim().to_lowercase().replace(' ', "_");
+                        if !var_name.is_empty() {
+                            // 生成 FileBox 内容作为变量值
+                            match generate_file_box_content(file_box, file_box_data) {
+                                Ok(file_content) => {
+                                    if !file_content.is_empty() {
+                                        shadow_vars.insert(var_name, file_content);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error generating file box shadow content: {}", e);
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -161,7 +161,7 @@
     let result = "";
     let shadowVars = new Map();
 
-    // 收集 Shadow 模式的变量
+    // 收集 TextBox Shadow 模式的变量
     Object.values(currentFile.text_boxes).forEach((tb) => {
       if (tb.mode === "shadow") {
         const variantData = currentFile.variants[tb.id];
@@ -173,6 +173,26 @@
             shadowVars.set(varName, content);
           }
         });
+      }
+    });
+
+    // 收集 FileBox Shadow 模式的变量
+    Object.entries(currentFile.file_boxes || {}).forEach(([fileBoxId, fileBox]) => {
+      if (fileBox.mode === "shadow") {
+        const fileBoxData = currentFile.file_box_data?.[fileBoxId];
+        if (fileBoxData) {
+          const varName = fileBoxData.title?.trim().toLowerCase().replace(/\s+/g, "_") || "";
+          if (varName) {
+            // 生成 FileBox 内容作为变量值
+            generateFileBoxContent(fileBoxId).then(content => {
+              if (content) {
+                shadowVars.set(varName, content);
+              }
+            }).catch(e => {
+              console.error("Error generating file box shadow content:", e);
+            });
+          }
+        }
       }
     });
 
