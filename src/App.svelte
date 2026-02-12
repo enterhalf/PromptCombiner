@@ -221,7 +221,10 @@
   // 键盘快捷键处理
   function handleKeyDown(e: KeyboardEvent) {
     // 如果正在输入文本，不处理快捷键
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+    if (
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement
+    ) {
       return;
     }
 
@@ -232,7 +235,10 @@
     }
 
     // Ctrl+Y 或 Ctrl+Shift+Z 重做
-    if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === "y" || (e.key === "z" && e.shiftKey))
+    ) {
       e.preventDefault();
       appStore.redo();
     }
@@ -282,7 +288,7 @@
           <div class="flex justify-center py-1">
             <button
               on:click={() => insertBefore(0)}
-              class="px-2 py-0.5 bg-green-600/80 hover:bg-green-700 text-white rounded text-xs opacity-0 hover:opacity-100 transition-opacity"
+              class="px-2 py-0.5 bg-green-600 text-white rounded text-xs opacity-10 hover:opacity-100 hover:scale-150 transition-all"
               title="Insert Text Box here"
             >
               + Text Box
@@ -317,7 +323,7 @@
                   <div class="flex justify-center py-1">
                     <button
                       on:click={() => insertAfter(index)}
-                      class="px-2 py-0.5 bg-green-600/80 hover:bg-green-700 text-white rounded text-xs opacity-0 hover:opacity-100 transition-opacity"
+                      class="px-2 py-0.5 bg-green-600 text-white rounded text-xs opacity-10 hover:opacity-100 hover:scale-150 transition-all"
                       title="Insert Text Box here"
                     >
                       + Text Box
