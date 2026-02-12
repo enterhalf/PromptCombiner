@@ -76,11 +76,15 @@
     const diff = e.clientY - startY;
     const newHeight = Math.max(100, startHeight + diff);
     height = newHeight;
-    dispatch("heightchange", { id: textBox.id, height: newHeight });
+    // 拖拽过程中不派发事件，避免占用撤销/重做历史
   }
 
   function handleResizeEnd() {
-    isResizing = false;
+    if (isResizing) {
+      isResizing = false;
+      // 拖拽结束时才派发事件，记录最终高度
+      dispatch("heightchange", { id: textBox.id, height });
+    }
   }
 
   function handleTitleInput(e: Event) {
