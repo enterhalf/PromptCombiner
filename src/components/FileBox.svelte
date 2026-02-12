@@ -1,10 +1,8 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
-  import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import { createEventDispatcher } from "svelte";
   import type { FileBox, FileBoxData, FileBoxItem } from "../types";
-  import { open } from "@tauri-apps/api/dialog";
-  import { appWindow } from "@tauri-apps/api/window";
-  import type { UnlistenFn } from "@tauri-apps/api/event";
+  import { open } from "@tauri-apps/plugin-dialog";
 
   export let fileBox: FileBox;
   export let index: number | undefined = undefined;
@@ -23,8 +21,6 @@
   let isDragOverDropZone = false;
   let fileInputElement: HTMLInputElement;
   let dropZoneElement: HTMLDivElement;
-  let unlistenFileDrop: UnlistenFn | null = null;
-  let isHoveringDropZone = false;
 
   $: height = fileBoxData.height;
   $: pathSegments = fileBoxData.path_segments;
@@ -423,53 +419,6 @@
       : fileBox.mode === "disabled"
         ? "bg-gray-800"
         : "bg-purple-800";
-
-  // Tauri v1 文件拖放事件处理
-  onMount(async () => {
-    try {
-      // 使用 appWindow.onFileDropEvent 监听文件拖放事件
-      unlistenFileDrop = await appWindow.onFileDropEvent((event) => {
-        const { type, paths } = event.payload;
-        console.log("[FileBox] Tauri file drop event:", type, paths);
-
-        if (type === "hover") {
-          // 文件拖拽悬停
-          isHoveringDropZone = true;
-          isDragOverDropZone = true;
-        } else if (type === "drop") {
-          // 文件拖放完成 - 使用 Tauri 提供的完整路径
-          isHoveringDropZone = false;
-          isDragOverDropZone = false;
-          
-          if (paths && paths.length > 0) {
-            console.log("[FileBox] Dropped files with full paths:", paths);
-            const newFiles: FileBoxItem[] = paths.map((path) => ({
-              id: generateId(),
-              path,
-              checked: true,
-            }));
-
-            dispatch("datachange", {
-              id: fileBox.id,
-              fileBoxData: { ...fileBoxData, files: [...files, ...newFiles] },
-            });
-          }
-        } else if (type === "cancelled") {
-          // 拖拽取消
-          isHoveringDropZone = false;
-          isDragOverDropZone = false;
-        }
-      });
-    } catch (error) {
-      console.error("[FileBox] Failed to setup file drop listener:", error);
-    }
-  });
-
-  onDestroy(() => {
-    if (unlistenFileDrop) {
-      unlistenFileDrop();
-    }
-  });
 </script>
 
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />

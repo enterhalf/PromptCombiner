@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import type { PromptFile, WorkspaceItem } from './types';
 
 export async function getWorkspaceItems(workspacePath: string): Promise<WorkspaceItem[]> {

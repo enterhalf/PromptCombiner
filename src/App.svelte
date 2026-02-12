@@ -1,10 +1,12 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
+  import { onMount, onDestroy } from "svelte";
   import { appStore, historyManager } from "./store";
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
   import FileBox from "./components/FileBox.svelte";
-  import type { TextBox as TextBoxType, FileBox as FileBoxType, FileBoxData, Variant, BoxType } from "./types";
+  import type { TextBox as TextBoxType, FileBox as FileBoxType, FileBoxData, Variant, BoxType, FileBoxItem } from "./types";
+  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   $: currentFile = $appStore.currentFile;
   $: canUndo = $historyManager.past.length > 0;
@@ -374,6 +376,97 @@
       appStore.redo();
     }
   }
+
+  // 全局文件拖放处理 - Tauri v2
+  let unlistenFileDrop: (() => void) | null = null;
+  let fileBoxElements: Map<string, HTMLElement> = new Map();
+  let hoveredFileBoxId: string | null = null;
+
+  // 注册 FileBox 元素引用
+  export function registerFileBoxElement(id: string, element: HTMLElement) {
+    fileBoxElements.set(id, element);
+  }
+
+  export function unregisterFileBoxElement(id: string) {
+    fileBoxElements.delete(id);
+  }
+
+  // 检查点是否在元素内
+  function isPointInElement(x: number, y: number, element: HTMLElement): boolean {
+    const rect = element.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  // 获取鼠标位置下的 FileBox ID
+  function getFileBoxAtPosition(x: number, y: number): string | null {
+    for (const [id, element] of fileBoxElements) {
+      if (isPointInElement(x, y, element)) {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  onMount(async () => {
+    try {
+      const webview = getCurrentWebviewWindow();
+      unlistenFileDrop = await webview.onDragDropEvent((event) => {
+        const { type, paths, position } = event.payload;
+        console.log("[App] Tauri v2 file drop event:", type, paths, position);
+
+        if (type === "over") {
+          // 检测鼠标位置下的 FileBox
+          if (position) {
+            const fileBoxId = getFileBoxAtPosition(position.x, position.y);
+            if (fileBoxId !== hoveredFileBoxId) {
+              hoveredFileBoxId = fileBoxId;
+              console.log("[App] Hovering over FileBox:", fileBoxId);
+            }
+          }
+        } else if (type === "drop") {
+          console.log("[App] Drop on FileBox:", hoveredFileBoxId);
+
+          if (hoveredFileBoxId && paths && paths.length > 0) {
+            // 找到对应的 FileBox 并添加文件
+            const fileBoxData = currentFile?.file_box_data?.[hoveredFileBoxId];
+            if (fileBoxData) {
+              const newFiles: FileBoxItem[] = paths.map((path) => ({
+                id: Math.random().toString(36).substr(2, 9),
+                path,
+                checked: true,
+              }));
+
+              appStore.setCurrentFile({
+                order: currentFile!.order,
+                text_boxes: currentFile!.text_boxes,
+                file_boxes: currentFile!.file_boxes,
+                file_box_data: {
+                  ...currentFile!.file_box_data,
+                  [hoveredFileBoxId]: {
+                    ...fileBoxData,
+                    files: [...fileBoxData.files, ...newFiles],
+                  },
+                },
+                variants: currentFile!.variants,
+                separators: currentFile!.separators,
+              });
+            }
+          }
+          hoveredFileBoxId = null;
+        } else if (type === "cancel") {
+          hoveredFileBoxId = null;
+        }
+      });
+    } catch (error) {
+      console.error("[App] Failed to setup file drop listener:", error);
+    }
+  });
+
+  onDestroy(() => {
+    if (unlistenFileDrop) {
+      unlistenFileDrop();
+    }
+  });
 </script>
 
 <svelte:window on:keydown={handleKeyDown} />

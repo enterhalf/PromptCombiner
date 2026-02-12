@@ -8,7 +8,7 @@
     deletePromptFile,
     copyPromptFile,
   } from "../tauri-api";
-  import { open } from "@tauri-apps/api/dialog";
+  import { open } from "@tauri-apps/plugin-dialog";
   import type { WorkspaceItem } from "../types";
   import Workbench from "./Workbench.svelte";
 

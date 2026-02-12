@@ -213,15 +213,15 @@ fn get_display_path(full_path: &str, path_segments: i32) -> String {
     if path_segments < 1 {
         return full_path.to_string();
     }
-    
+
     // 统一使用正斜杠处理路径
     let normalized_path = full_path.replace('\\', "/");
     let parts: Vec<&str> = normalized_path.split('/').filter(|p| !p.is_empty()).collect();
-    
+
     if parts.len() <= path_segments as usize {
         return full_path.to_string();
     }
-    
+
     // 保留最后 path_segments 个分段
     let start = parts.len() - path_segments as usize;
     let display_parts = &parts[start..];
@@ -413,6 +413,9 @@ fn read_file(file_path: String) -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             get_workspace_items,
             create_prompt_file,
