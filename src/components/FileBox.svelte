@@ -1,9 +1,8 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
-  import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import { createEventDispatcher } from "svelte";
   import type { FileBox, FileBoxData, FileBoxItem } from "../types";
   import { open } from "@tauri-apps/api/dialog";
-  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
   export let fileBox: FileBox;
   export let index: number | undefined = undefined;
@@ -19,11 +18,9 @@
   let isEditingPathSegments = false;
   let titleInput: HTMLInputElement;
   let isEditingTitle = false;
+  let isDragOverDropZone = false;
+  let fileInputElement: HTMLInputElement;
   let dropZoneElement: HTMLDivElement;
-  let unlistenFileDrop: UnlistenFn | null = null;
-  let unlistenFileDropHover: UnlistenFn | null = null;
-  let unlistenFileDropCancelled: UnlistenFn | null = null;
-  let isDragOver = false;
 
   $: height = fileBoxData.height;
   $: pathSegments = fileBoxData.path_segments;
@@ -267,35 +264,49 @@
     });
   }
 
-  // 处理拖放文件到框体内
-  function handleDragOver(e: DragEvent) {
+  // 处理拖放区域的事件
+  function handleDropZoneDragOver(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
+    isDragOverDropZone = true;
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "copy";
     }
+    console.log("[FileBox] Drag over drop zone");
   }
 
-  async function handleDrop(e: DragEvent) {
+  function handleDropZoneDragLeave(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
+    // 检查是否真的离开了元素（而不是进入了子元素）
+    const rect = dropZoneElement.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      isDragOverDropZone = false;
+      console.log("[FileBox] Drag leave drop zone");
+    }
+  }
+
+  function handleDropZoneDrop(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    isDragOverDropZone = false;
+    console.log("[FileBox] Drop event triggered");
 
     const droppedFiles: string[] = [];
 
     if (e.dataTransfer) {
-      // 尝试从 dataTransfer 获取文件路径（Tauri 桌面环境）
-      // 在 Tauri 中，拖放的文件路径可以通过 dataTransfer.files 获取
+      console.log("[FileBox] dataTransfer available, types:", e.dataTransfer.types);
+      console.log("[FileBox] files count:", e.dataTransfer.files?.length);
+      console.log("[FileBox] items count:", e.dataTransfer.items?.length);
 
-      // 首先尝试获取 files
+      // 尝试从 dataTransfer 获取文件路径（Tauri 桌面环境）
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
         for (let i = 0; i < e.dataTransfer.files.length; i++) {
           const file = e.dataTransfer.files[i];
-          // 在 Tauri 中，可以通过 webkitRelativePath 或 path 获取完整路径
-          // 但浏览器安全限制通常不允许直接获取完整路径
-          // 我们需要使用 Tauri 的 API 来处理文件拖放
-
-          // 尝试获取路径 - 在 Tauri 环境中可能有特殊处理
           const path = (file as any).path || file.name;
+          console.log("[FileBox] File from dataTransfer.files:", file.name, "path:", (file as any).path);
           if (path) {
             droppedFiles.push(path);
           }
@@ -310,6 +321,7 @@
             const file = item.getAsFile();
             if (file) {
               const path = (file as any).path || file.name;
+              console.log("[FileBox] File from dataTransfer.items:", file.name, "path:", (file as any).path);
               if (path) {
                 droppedFiles.push(path);
               }
@@ -321,6 +333,7 @@
       // 尝试从 text/plain 获取（某些文件管理器会提供路径）
       if (droppedFiles.length === 0) {
         const textData = e.dataTransfer.getData("text/plain");
+        console.log("[FileBox] text/plain data:", textData);
         if (textData) {
           droppedFiles.push(...textData.split("\n").filter((p) => p.trim()));
         }
@@ -329,6 +342,7 @@
       // 尝试从 text/uri-list 获取
       if (droppedFiles.length === 0) {
         const uriList = e.dataTransfer.getData("text/uri-list");
+        console.log("[FileBox] text/uri-list data:", uriList);
         if (uriList) {
           const uris = uriList
             .split("\n")
@@ -350,6 +364,8 @@
       }
     }
 
+    console.log("[FileBox] Dropped files:", droppedFiles);
+
     if (droppedFiles.length > 0) {
       const newFiles: FileBoxItem[] = droppedFiles.map((path) => ({
         id: generateId(),
@@ -364,6 +380,39 @@
     }
   }
 
+  // 处理原生文件输入变化
+  function handleFileInputChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const selectedFiles = input.files;
+    
+    if (selectedFiles && selectedFiles.length > 0) {
+      const newFiles: FileBoxItem[] = [];
+      
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        // 在 Tauri 中，可以通过 path 属性获取完整路径
+        const path = (file as any).path || file.name;
+        if (path) {
+          newFiles.push({
+            id: generateId(),
+            path,
+            checked: true,
+          });
+        }
+      }
+
+      if (newFiles.length > 0) {
+        dispatch("datachange", {
+          id: fileBox.id,
+          fileBoxData: { ...fileBoxData, files: [...files, ...newFiles] },
+        });
+      }
+    }
+    
+    // 重置 input 以便可以再次选择相同文件
+    input.value = "";
+  }
+
   $: modeColor =
     fileBox.mode === "normal"
       ? "bg-gray-700"
@@ -371,81 +420,18 @@
         ? "bg-gray-800"
         : "bg-purple-800";
 
-  // 检查点是否在元素内
-  function isPointInElement(
-    x: number,
-    y: number,
-    element: HTMLElement
-  ): boolean {
-    const rect = element.getBoundingClientRect();
-    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-  }
 
-  // Tauri v1 文件拖放事件处理
-  onMount(async () => {
-    try {
-      // 监听 tauri://file-drop-hover 事件（拖拽悬停）
-      // Tauri v1 中 payload 直接是路径数组
-      unlistenFileDropHover = await listen<string[]>("tauri://file-drop-hover", (event) => {
-        // 当有文件悬停时显示高亮
-        isDragOver = true;
-      });
-
-      // 监听 tauri://file-drop-cancelled 事件（拖拽取消）
-      unlistenFileDropCancelled = await listen("tauri://file-drop-cancelled", () => {
-        isDragOver = false;
-      });
-
-      // 监听 tauri://file-drop 事件（文件拖放完成）
-      // Tauri v1 中 payload 直接是路径数组 string[]
-      unlistenFileDrop = await listen<string[]>("tauri://file-drop", (event) => {
-        isDragOver = false;
-
-        // 获取拖放的文件路径
-        const droppedFiles = event.payload;
-        if (droppedFiles && droppedFiles.length > 0) {
-          const newFiles: FileBoxItem[] = droppedFiles.map((path) => ({
-            id: generateId(),
-            path,
-            checked: true,
-          }));
-
-          dispatch("datachange", {
-            id: fileBox.id,
-            fileBoxData: { ...fileBoxData, files: [...files, ...newFiles] },
-          });
-        }
-      });
-    } catch (error) {
-      console.error("Failed to setup file drop listener:", error);
-    }
-  });
-
-  onDestroy(() => {
-    if (unlistenFileDrop) {
-      unlistenFileDrop();
-    }
-    if (unlistenFileDropHover) {
-      unlistenFileDropHover();
-    }
-    if (unlistenFileDropCancelled) {
-      unlistenFileDropCancelled();
-    }
-  });
 </script>
 
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
 
 <div
-  bind:this={dropZoneElement}
   class="flex flex-col bg-gray-800 rounded-lg mb-2 overflow-hidden relative {isDragging
     ? 'opacity-50'
-    : ''} {isDragOver
-    ? 'ring-2 ring-blue-500 ring-opacity-50'
     : ''}"
   style="height: {height}px;"
   role="region"
-  aria-label="File box drop zone"
+  aria-label="File box"
 >
   <!-- 标题栏 -->
   <div
@@ -542,7 +528,7 @@
     </div>
   </div>
 
-  <!-- 文件列表区域 -->
+  <!-- 文件列表区域 - 仅用于显示和排序 -->
   <div class="flex-1 overflow-hidden flex flex-col">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
@@ -607,15 +593,60 @@
       {/each}
     </div>
 
-    <!-- 添加按钮 -->
-    <button
-      on:click={handleAddFiles}
-      class="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white text-sm border-t border-gray-600 transition-colors flex items-center justify-center gap-1"
-      title="Add files"
+    <!-- 文件拖放区域 - 独立的原生文件输入框 -->
+    <div
+      bind:this={dropZoneElement}
+      class="relative border-t border-gray-600 {isDragOverDropZone ? 'bg-blue-900/30' : 'bg-gray-750'}"
+      on:dragover={handleDropZoneDragOver}
+      on:dragleave={handleDropZoneDragLeave}
+      on:drop={handleDropZoneDrop}
+      role="button"
+      tabindex="0"
+      aria-label="Drop files here"
     >
-      <span>+</span>
-      <span>Add Files</span>
-    </button>
+      <!-- 视觉呈现层 - 在文件输入之上 -->
+      <label 
+        for="file-input-{fileBox.id}"
+        class="block py-3 px-4 flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer {isDragOverDropZone ? 'text-blue-300' : 'text-gray-400 hover:text-gray-300'}"
+      >
+        <svg 
+          class="w-5 h-5 {isDragOverDropZone ? 'text-blue-400' : 'text-gray-500'}" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            stroke-width="2" 
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+          />
+        </svg>
+        <span>
+          {#if isDragOverDropZone}
+            Drop files here
+          {:else}
+            Click or drag files here
+          {/if}
+        </span>
+      </label>
+      
+      <!-- 原生文件输入 - 隐藏 -->
+      <input
+        id="file-input-{fileBox.id}"
+        bind:this={fileInputElement}
+        type="file"
+        multiple
+        on:change={handleFileInputChange}
+        class="hidden"
+        title="Click to select files or drag and drop files here"
+      />
+      
+      <!-- 拖拽高亮边框 -->
+      {#if isDragOverDropZone}
+        <div class="absolute inset-0 border-2 border-blue-500 border-dashed pointer-events-none"></div>
+      {/if}
+    </div>
   </div>
 
   <div
