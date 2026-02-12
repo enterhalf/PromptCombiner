@@ -1,6 +1,30 @@
 import { writable, get } from "svelte/store";
-import type { AppState, PromptFile, WorkspaceItem } from "./types";
+import type { AppState, PromptFile, WorkspaceItem, VariantData } from "./types";
 import { savePromptFile } from "./tauri-api";
+
+// 清理变体数据：如果标题以 "！" 或 "!" 开头，则将内容设为空字符串（不保存到本地）
+function cleanVariantDataForSave(promptFile: PromptFile): PromptFile {
+  const cleanedVariants: Record<string, VariantData> = {};
+
+  for (const [id, variantData] of Object.entries(promptFile.variants)) {
+    cleanedVariants[id] = {
+      ...variantData,
+      variants: variantData.variants.map((variant) => {
+        const title = variant.title || "";
+        // 如果标题以 "！" 或 "!" 开头，则清空内容（不保存超长文本到配置文件）
+        if (title.startsWith("！") || title.startsWith("!")) {
+          return { ...variant, content: "" };
+        }
+        return variant;
+      }),
+    };
+  }
+
+  return {
+    ...promptFile,
+    variants: cleanedVariants,
+  };
+}
 
 const RECENT_WORKSPACES_KEY = "prompt-combiner-recent-workspaces";
 const MAX_RECENT_WORKSPACES = 10;
@@ -132,7 +156,8 @@ function createAppStore() {
     if (state.currentFile && state.workspacePath && state.currentFileName) {
       try {
         const filePath = `${state.workspacePath}/${state.currentFileName}`;
-        await savePromptFile(filePath, state.currentFile);
+        const cleanedFile = cleanVariantDataForSave(state.currentFile);
+        await savePromptFile(filePath, cleanedFile);
       } catch (error) {
         console.error("Auto-save failed:", error);
       }
@@ -153,7 +178,8 @@ function createAppStore() {
     if (state.currentFile && state.workspacePath && state.currentFileName) {
       try {
         const filePath = `${state.workspacePath}/${state.currentFileName}`;
-        await savePromptFile(filePath, state.currentFile);
+        const cleanedFile = cleanVariantDataForSave(state.currentFile);
+        await savePromptFile(filePath, cleanedFile);
         return true;
       } catch (error) {
         console.error("Save failed:", error);

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
   import { appStore, historyManager } from "./store";
-  import { savePromptFile } from "./tauri-api";
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
   import type { TextBox as TextBoxType, Variant, BoxType } from "./types";
@@ -153,8 +152,13 @@
 
     try {
       const filePath = `${$appStore.workspacePath}/${$appStore.currentFileName}`;
-      await savePromptFile(filePath, currentFile);
-      alert("File saved successfully!");
+      // 使用 store 中的保存方法，它会自动处理标题清理
+      const success = await appStore.saveCurrentFile();
+      if (success) {
+        alert("File saved successfully!");
+      } else {
+        alert("Failed to save file");
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
