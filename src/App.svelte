@@ -378,12 +378,6 @@
 
 <svelte:window on:keydown={handleKeyDown} />
 
-<!-- 全局拖放阻止 - 防止浏览器默认行为 -->
-<svelte:body
-  on:dragover|preventDefault|stopPropagation={() => {}}
-  on:drop|preventDefault|stopPropagation={() => {}}
-/>
-
 <div class="flex h-screen bg-gray-900">
   <Sidebar />
 
