@@ -20,7 +20,6 @@
   let titleInput: HTMLInputElement;
   let isEditingTitle = false;
   let isDragOverDropZone = false;
-  let fileInputElement: HTMLInputElement;
   let dropZoneElement: HTMLDivElement;
   let unlistenDragDrop: (() => void) | null = null;
 
@@ -144,6 +143,7 @@
       const selected = await open({
         multiple: false,
         directory: false,
+        title: "选择文件",
       });
 
       if (selected && typeof selected === "string") {
@@ -168,6 +168,7 @@
       const selected = await open({
         multiple: true,
         directory: false,
+        title: "选择文件",
       });
 
       if (selected && Array.isArray(selected) && selected.length > 0) {
@@ -391,37 +392,30 @@
     }
   }
 
-  // 处理原生文件输入变化
-  function handleFileInputChange(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const selectedFiles = input.files;
-    
-    if (selectedFiles && selectedFiles.length > 0) {
-      const newFiles: FileBoxItem[] = [];
-      
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
-        // 在 Tauri 中，可以通过 path 属性获取完整路径
-        const path = (file as any).path || file.name;
-        if (path) {
-          newFiles.push({
-            id: generateId(),
-            path,
-            checked: true,
-          });
-        }
-      }
+  // 处理点击选择文件 - 使用 Tauri 对话框获取完整路径
+  async function handleClickSelectFiles() {
+    try {
+      const selected = await open({
+        multiple: true,
+        directory: false,
+        title: "选择文件",
+      });
 
-      if (newFiles.length > 0) {
+      if (selected && Array.isArray(selected) && selected.length > 0) {
+        const newFiles: FileBoxItem[] = selected.map((path) => ({
+          id: generateId(),
+          path,
+          checked: true,
+        }));
+
         dispatch("datachange", {
           id: fileBox.id,
           fileBoxData: { ...fileBoxData, files: [...files, ...newFiles] },
         });
       }
+    } catch (error) {
+      console.error("Failed to select files:", error);
     }
-    
-    // 重置 input 以便可以再次选择相同文件
-    input.value = "";
   }
 
   $: modeColor =
@@ -638,21 +632,23 @@
       tabindex="0"
       aria-label="Drop files here"
     >
-      <!-- 视觉呈现层 - 在文件输入之上 -->
-      <label 
-        for="file-input-{fileBox.id}"
-        class="block py-3 px-4 flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer {isDragOverDropZone ? 'text-blue-300' : 'text-gray-400 hover:text-gray-300'}"
+      <!-- 视觉呈现层 - 点击使用 Tauri 对话框选择文件 -->
+      <button
+        type="button"
+        on:click={handleClickSelectFiles}
+        class="w-full py-3 px-4 flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer {isDragOverDropZone ? 'text-blue-300' : 'text-gray-400 hover:text-gray-300'}"
+        disabled={isDragOverDropZone}
       >
-        <svg 
-          class="w-5 h-5 {isDragOverDropZone ? 'text-blue-400' : 'text-gray-500'}" 
-          fill="none" 
-          stroke="currentColor" 
+        <svg
+          class="w-5 h-5 {isDragOverDropZone ? 'text-blue-400' : 'text-gray-500'}"
+          fill="none"
+          stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path 
-            stroke-linecap="round" 
-            stroke-linejoin="round" 
-            stroke-width="2" 
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
           />
         </svg>
@@ -663,18 +659,7 @@
             Click or drag files here
           {/if}
         </span>
-      </label>
-      
-      <!-- 原生文件输入 - 隐藏 -->
-      <input
-        id="file-input-{fileBox.id}"
-        bind:this={fileInputElement}
-        type="file"
-        multiple
-        on:change={handleFileInputChange}
-        class="hidden"
-        title="Click to select files or drag and drop files here"
-      />
+      </button>
       
       <!-- 拖拽高亮边框 -->
       {#if isDragOverDropZone}

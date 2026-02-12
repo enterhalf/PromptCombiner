@@ -53,7 +53,7 @@
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Select Workspace Folder",
+        title: "选择工作区文件夹",
       });
 
       if (selected && typeof selected === "string") {
