@@ -138,10 +138,8 @@ function createHistoryManager() {
       set({ past: [], present: null, future: [] });
     },
     setPresent: (present: PromptFile | null) => {
-      update((state) => ({
-        ...state,
-        present,
-      }));
+      // 设置当前状态并清空历史记录（用于初始化新文件状态）
+      set({ past: [], present, future: [] });
     },
   };
 }
@@ -221,6 +219,9 @@ function createAppStore() {
       // 记录历史（除非是撤销/重做操作或初始化）
       if (file && !skipHistory) {
         historyManager.push(file);
+      } else if (file && skipHistory) {
+        // 初始化历史记录状态，但不添加到历史记录中
+        historyManager.setPresent(file);
       } else if (file === null) {
         historyManager.reset();
       }
