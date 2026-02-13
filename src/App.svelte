@@ -19,61 +19,9 @@
   $: canUndo = $historyManager.past.length > 0;
   $: canRedo = $historyManager.future.length > 0;
 
-  let unlistenFileDrop: (() => void) | null = null;
-
-  // 在 App 级别处理文件拖放事件
-  onMount(async () => {
-    try {
-      const webview = getCurrentWebviewWindow();
-      unlistenFileDrop = await webview.onDragDropEvent((event) => {
-        const payload = event.payload as {
-          type: string;
-          paths?: string[];
-          position?: { x: number; y: number };
-        };
-        const { type, paths, position } = payload;
-
-        if (type === "drop" && paths && paths.length > 0 && position) {
-          // 找到拖放位置下的 FileBox 元素
-          const element = document.elementFromPoint(position.x, position.y);
-          const fileBoxElement = element?.closest('[data-filebox-id]');
-          
-          if (fileBoxElement) {
-            const fileBoxId = fileBoxElement.getAttribute('data-filebox-id');
-            if (fileBoxId && currentFile) {
-              // 找到对应的 FileBox 数据
-              const fileBoxData = currentFile.file_box_data?.[fileBoxId];
-              if (fileBoxData) {
-                // 添加文件到 FileBox
-                const newFiles: FileBoxItem[] = paths.map((path) => ({
-                  id: Math.random().toString(36).substr(2, 9),
-                  path,
-                  checked: true,
-                }));
-
-                appStore.setCurrentFile({
-                  order: currentFile.order,
-                  text_boxes: currentFile.text_boxes,
-                  file_boxes: currentFile.file_boxes,
-                  file_box_data: {
-                    ...(currentFile.file_box_data || {}),
-                    [fileBoxId]: {
-                      ...fileBoxData,
-                      files: [...fileBoxData.files, ...newFiles],
-                    },
-                  },
-                  variants: currentFile.variants,
-                  separators: currentFile.separators,
-                });
-              }
-            }
-          }
-        }
-      });
-    } catch (error) {
-      console.error("[App] Failed to setup file drop listener:", error);
-    }
-  });
+  // 跟踪哪个 FileBox 正在被拖放文件
+  let activeDragOverFileBoxId: string | null = null;
+  let unlistenDragDrop: (() => void) | null = null;
 
   // 用于 dnd-zone 的列表
   $: boxList = currentFile
@@ -84,6 +32,7 @@
         fileBox: currentFile.file_boxes?.[id],
         variantData: currentFile.variants[id],
         fileBoxData: currentFile.file_box_data?.[id],
+        isFileDragOver: activeDragOverFileBoxId === id, // 传递拖放状态
       }))
     : [];
 
@@ -446,9 +395,79 @@
     }
   }
 
+  // 设置 Tauri 拖放事件监听
+  onMount(async () => {
+    try {
+      const webview = getCurrentWebviewWindow();
+      unlistenDragDrop = await webview.onDragDropEvent((event) => {
+        const payload = event.payload as {
+          type: string;
+          paths?: string[];
+          position?: { x: number; y: number };
+        };
+        const { type, paths, position } = payload;
+
+        if (type === "over" && position) {
+          // 检查鼠标位置下的 FileBox 元素
+          const element = document.elementFromPoint(position.x, position.y);
+          const fileBoxElement = element?.closest("[data-filebox-id]");
+
+          if (fileBoxElement) {
+            const fileBoxId = fileBoxElement.getAttribute("data-filebox-id");
+            activeDragOverFileBoxId = fileBoxId;
+          } else {
+            activeDragOverFileBoxId = null;
+          }
+        } else if (type === "drop" && paths && paths.length > 0 && position) {
+          // 找到拖放位置下的 FileBox 元素
+          const element = document.elementFromPoint(position.x, position.y);
+          const fileBoxElement = element?.closest("[data-filebox-id]");
+
+          if (fileBoxElement) {
+            const fileBoxId = fileBoxElement.getAttribute("data-filebox-id");
+            if (fileBoxId && currentFile) {
+              // 找到对应的 FileBox 数据
+              const fileBoxData = currentFile.file_box_data?.[fileBoxId];
+              if (fileBoxData) {
+                // 添加文件到 FileBox
+                const newFiles: FileBoxItem[] = paths.map((path) => ({
+                  id: Math.random().toString(36).substr(2, 9),
+                  path,
+                  checked: true,
+                }));
+
+                appStore.setCurrentFile({
+                  order: currentFile.order,
+                  text_boxes: currentFile.text_boxes,
+                  file_boxes: currentFile.file_boxes,
+                  file_box_data: {
+                    ...(currentFile.file_box_data || {}),
+                    [fileBoxId]: {
+                      ...fileBoxData,
+                      files: [...fileBoxData.files, ...newFiles],
+                    },
+                  },
+                  variants: currentFile.variants,
+                  separators: currentFile.separators,
+                });
+              }
+            }
+          }
+          // 重置拖放状态
+          activeDragOverFileBoxId = null;
+        } else if (type === "leave") {
+          // 鼠标离开拖放区域
+          activeDragOverFileBoxId = null;
+        }
+      });
+    } catch (error) {
+      console.error("[App] Failed to setup drag drop listener:", error);
+    }
+  });
+
   onDestroy(() => {
-    if (unlistenFileDrop) {
-      unlistenFileDrop();
+    if (unlistenDragDrop) {
+      unlistenDragDrop();
     }
   });
 </script>
@@ -558,11 +577,13 @@
               {:else if type === "file"}
                 {@const fileBox = item.fileBox}
                 {@const fileBoxData = item.fileBoxData}
+                {@const isFileDragOver = item.isFileDragOver}
                 {#if fileBox && fileBoxData}
                   <div id={fileBox.id}>
                     <FileBox
                       {fileBox}
                       {fileBoxData}
+                      {isFileDragOver}
                       on:change={handleFileBoxChange}
                       on:heightchange={handleFileBoxHeightChange}
                       on:delete={handleFileBoxDelete}

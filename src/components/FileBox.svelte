@@ -7,6 +7,7 @@
   export let fileBox: FileBox;
   export let index: number | undefined = undefined;
   export let fileBoxData: FileBoxData;
+  export let isFileDragOver: boolean = false; // 从父组件接收拖放状态
 
   const dispatch = createEventDispatcher();
 
@@ -101,7 +102,7 @@
 
     if (parts.length <= pathSegments) return fullPath;
 
-    // 保留最后 pathSegments 个分段
+    // 保留最后 path_segments 个分段
     const displayParts = parts.slice(-pathSegments);
     return displayParts.join("/");
   }
@@ -295,7 +296,6 @@
       : fileBox.mode === "disabled"
         ? "bg-gray-800"
         : "bg-purple-800";
-
 </script>
 
 <svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
@@ -471,17 +471,21 @@
 
     <!-- 文件拖放区域 - 点击使用 Tauri 对话框选择文件 -->
     <div
-      class="relative border-t border-gray-600 bg-gray-750 transition-colors"
+      class="relative border-t border-gray-600 bg-gray-750 transition-colors {isFileDragOver
+        ? 'bg-blue-900/30 border-blue-500'
+        : ''}"
       role="button"
       tabindex="0"
       aria-label="Drop files here"
       on:click={handleClickSelectFiles}
     >
       <div
-        class="w-full py-3 px-4 flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer text-gray-400 hover:text-gray-300"
+        class="w-full py-3 px-4 flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer {isFileDragOver
+          ? 'text-blue-400'
+          : 'text-gray-400 hover:text-gray-300'}"
       >
         <svg
-          class="w-5 h-5 text-gray-500"
+          class="w-5 h-5 {isFileDragOver ? 'text-blue-400' : 'text-gray-500'}"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -493,7 +497,11 @@
             d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
           />
         </svg>
-        <span>Click or drag files here</span>
+        <span
+          >{isFileDragOver
+            ? "Drop files here"
+            : "Click or drag files here"}</span
+        >
       </div>
     </div>
   </div>
