@@ -11,6 +11,10 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
 ### ✨ 主要功能
 
 - **多文本框管理**：创建多个文本框，支持拖拽排序
+- **文件框（File Box）**：管理和引用多个文件，自动生成带文件路径的代码块
+  - 支持批量添加文件
+  - 可设置路径显示分段数
+  - 文件内容自动读取并生成代码块格式
 - **三种模式**：
   - **普通模式**：参与最终提示词生成
   - **禁用模式**：不参与生成
@@ -35,8 +39,10 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
 
 1. **选择工作区**：点击左侧边栏的"选择工作区"，选择你的工作目录
 2. **创建文件**：点击"+ 新建文件"创建一个新的 `.prompt` 文件
-3. **添加文本框**：点击"+ Text Box"添加文本框
-4. **编辑内容**：在文本框中输入你的提示词内容
+3. **添加文本框**：点击"+ Text Box"添加文本框，或点击"+ File Box"添加文件框
+4. **编辑内容**：
+   - 在文本框中输入你的提示词内容
+   - 在文件框中添加文件，自动生成代码块格式
 5. **设置模式**：通过下拉菜单设置文本框模式（普通/禁用/影子）
 6. **生成提示词**：点击"生成"或"生成并复制"按钮生成最终提示词
 
@@ -47,6 +53,11 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
 - **使用变量**：将文本框设置为"影子模式"，在其他文本框中使用 `{{变量名}}` 引用
 - **创建变体**：点击文本框右侧的"+"按钮创建变体，方便对比不同版本
 - **临时内容**：标题以 `!` 开头的文本框内容不会被保存
+- **文件框使用**：
+  - 点击"Click or drag files here"添加文件
+  - 设置"Path segments"控制显示的路径层级（0 显示完整路径）
+  - 勾选/取消勾选文件控制是否包含在输出中
+  - 文件内容会自动读取并以代码块形式包含在生成的提示词中
 
 ### ⌨️ 快捷键
 
@@ -66,6 +77,10 @@ Prompt Combiner is a cross-platform prompt management and combination tool that 
 ### ✨ Features
 
 - **Multiple Text Boxes**: Create and manage multiple text boxes with drag-and-drop reordering
+- **File Box**: Manage and reference multiple files, automatically generate code blocks with file paths
+  - Support batch file addition
+  - Configurable path segment display
+  - Automatic file content reading and code block generation
 - **Three Modes**:
   - **Normal**: Participates in final prompt generation
   - **Disabled**: Excluded from generation
@@ -90,8 +105,10 @@ We provide pre-built installation packages for Windows, macOS, and Linux.
 
 1. **Select Workspace**: Click "Select Workspace" in the left sidebar to choose your working directory
 2. **Create File**: Click "+ New File" to create a new `.prompt` file
-3. **Add Text Boxes**: Click "+ Text Box" to add text boxes
-4. **Edit Content**: Enter your prompt content in the text boxes
+3. **Add Text Boxes**: Click "+ Text Box" to add text boxes, or "+ File Box" to add file boxes
+4. **Edit Content**:
+   - Enter your prompt content in the text boxes
+   - Add files to file boxes for automatic code block generation
 5. **Set Mode**: Use the dropdown to set text box mode (Normal/Disabled/Shadow)
 6. **Generate Prompt**: Click "Generate" or "Generate & Copy" to generate the final prompt
 
@@ -102,6 +119,11 @@ We provide pre-built installation packages for Windows, macOS, and Linux.
 - **Use Variables**: Set text box to "Shadow" mode and use `{{variable_name}}` in other text boxes to reference it
 - **Create Variants**: Click the "+" button on the right side of text boxes to create variants for comparing different versions
 - **Temporary Content**: Text boxes with titles starting with `!` will not be saved
+- **File Box Usage**:
+  - Click "Click or drag files here" to add files
+  - Set "Path segments" to control displayed path levels (0 = full path)
+  - Check/uncheck files to control inclusion in output
+  - File contents are automatically read and included as code blocks in generated prompts
 
 ### ⌨️ Keyboard Shortcuts
 
@@ -162,6 +184,7 @@ prompt-combiner/
 ├── src/
 │   ├── components/
 │   │   ├── TextBox.svelte      # 文本框组件 | Text box component with modes and variants
+│   │   ├── FileBox.svelte      # 文件框组件 | File box component for managing files
 │   │   ├── Separator.svelte     # 分隔符组件 | Separator component
 │   │   ├── Sidebar.svelte       # 文件浏览器和导航 | File browser and navigation
 │   │   └── Workbench.svelte     # 生成和大纲视图 | Generation and outline view
@@ -188,11 +211,33 @@ prompt-combiner/
 
 ```json
 {
-  "order": ["id1", "id2"],
+  "order": ["id1", "id2", "id3"],
   "text_boxes": {
     "id1": {
       "id": "unique-id",
-      "mode": "normal"
+      "mode": "normal",
+      "type": "text"
+    }
+  },
+  "file_boxes": {
+    "id3": {
+      "id": "unique-id",
+      "mode": "normal",
+      "type": "file"
+    }
+  },
+  "file_box_data": {
+    "id3": {
+      "height": 200,
+      "path_segments": 2,
+      "title": "Source Files",
+      "files": [
+        {
+          "id": "file-id",
+          "path": "/path/to/file.rs",
+          "checked": true
+        }
+      ]
     }
   },
   "variants": {
