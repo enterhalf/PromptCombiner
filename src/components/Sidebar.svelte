@@ -23,6 +23,8 @@
   let showCopyDialog = false;
   let copyItem: WorkspaceItem | null = null;
   let copyName = "";
+  let showDeleteDialog = false;
+  let deleteItem: WorkspaceItem | null = null;
   // Tauri v2 检测：检查 window.__TAURI_INTERNALS__ 是否存在
   let isTauriEnv =
     typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -188,16 +190,28 @@
     }
   }
 
-  async function handleDelete(item: WorkspaceItem) {
-    if (confirm(`Are you sure you want to delete ${item.name}?`)) {
-      try {
-        await deletePromptFile(item.path);
-        await loadWorkspace();
-      } catch (error) {
-        console.error("Failed to delete file:", error);
-        alert("Failed to delete file");
-      }
+  function handleDeleteClick(e: Event, item: WorkspaceItem) {
+    e.stopPropagation();
+    deleteItem = item;
+    showDeleteDialog = true;
+  }
+
+  async function confirmDelete() {
+    if (!deleteItem) return;
+    try {
+      await deletePromptFile(deleteItem.path);
+      await loadWorkspace();
+      showDeleteDialog = false;
+      deleteItem = null;
+    } catch (error) {
+      console.error("Failed to delete file:", error);
+      alert("Failed to delete file");
     }
+  }
+
+  function cancelDelete() {
+    showDeleteDialog = false;
+    deleteItem = null;
   }
 
   function handleResizeStart(e: MouseEvent) {
@@ -361,7 +375,7 @@
                   📋
                 </button>
                 <button
-                  on:click|stopPropagation={() => handleDelete(item)}
+                  on:click={(e) => handleDeleteClick(e, item)}
                   class="text-gray-400 hover:text-red-400 px-1"
                   title="Delete"
                 >
@@ -497,6 +511,31 @@
           class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         >
           Copy
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showDeleteDialog && deleteItem}
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg p-6 w-96">
+      <h2 class="text-white text-lg font-bold mb-4">Confirm Delete</h2>
+      <p class="text-gray-300 mb-4">
+        Are you sure you want to delete <span class="text-white font-semibold">{deleteItem.name}</span>?
+      </p>
+      <div class="flex justify-end gap-2">
+        <button
+          on:click={cancelDelete}
+          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
+        >
+          Cancel
+        </button>
+        <button
+          on:click={confirmDelete}
+          class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+        >
+          Delete
         </button>
       </div>
     </div>
