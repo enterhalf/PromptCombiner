@@ -407,50 +407,89 @@
         };
         const { type, paths, position } = payload;
 
-        if (type === "over" && position) {
-          // 检查鼠标位置下的 FileBox 元素
-          const element = document.elementFromPoint(position.x, position.y);
-          const fileBoxElement = element?.closest("[data-filebox-id]");
+        // 辅助函数：找到包含指定点的 FileBox
+        function findFileBoxAtPoint(x: number, y: number): string | null {
+          // 获取所有 FileBox 元素
+          const fileBoxes = document.querySelectorAll("[data-filebox-id]");
 
-          if (fileBoxElement) {
-            const fileBoxId = fileBoxElement.getAttribute("data-filebox-id");
-            activeDragOverFileBoxId = fileBoxId;
-          } else {
-            activeDragOverFileBoxId = null;
+          for (const box of fileBoxes) {
+            const rect = box.getBoundingClientRect();
+            if (
+              x >= rect.left &&
+              x <= rect.right &&
+              y >= rect.top &&
+              y <= rect.bottom
+            ) {
+              return box.getAttribute("data-filebox-id");
+            }
           }
+          return null;
+        }
+
+        // 获取滚动容器的滚动偏移
+        function getScrollOffset(): number {
+          const scrollContainer = document.querySelector(
+            ".flex-1.overflow-y-auto"
+          );
+          if (scrollContainer) {
+            return scrollContainer.scrollTop;
+          }
+          return 0;
+        }
+
+        // 获取 DPI 缩放因子
+        const scaleFactor = window.devicePixelRatio || 1;
+
+        if (type === "over" && position) {
+          // Tauri 返回的 position 是物理像素坐标（相对于 webview 内容区域）
+          // 需要转换为 CSS 像素坐标，与 getBoundingClientRect 保持一致
+          const scrollOffset = getScrollOffset();
+
+          // 转换坐标：
+          // 1. Tauri 的坐标是物理像素，需要除以 scaleFactor 转换为 CSS 像素
+          // 2. Tauri 的 y 坐标是相对于 webview 内容顶部的（包含滚动）
+          //    需要减去滚动偏移，转换为相对于视口的坐标
+          const viewportX = position.x / scaleFactor;
+          const viewportY = position.y / scaleFactor - scrollOffset;
+
+          // 使用 getBoundingClientRect 检测 FileBox
+          const fileBoxId = findFileBoxAtPoint(viewportX, viewportY);
+          activeDragOverFileBoxId = fileBoxId;
         } else if (type === "drop" && paths && paths.length > 0 && position) {
-          // 找到拖放位置下的 FileBox 元素
-          const element = document.elementFromPoint(position.x, position.y);
-          const fileBoxElement = element?.closest("[data-filebox-id]");
+          // 转换坐标（同上）
+          const scrollOffset = getScrollOffset();
 
-          if (fileBoxElement) {
-            const fileBoxId = fileBoxElement.getAttribute("data-filebox-id");
-            if (fileBoxId && currentFile) {
-              // 找到对应的 FileBox 数据
-              const fileBoxData = currentFile.file_box_data?.[fileBoxId];
-              if (fileBoxData) {
-                // 添加文件到 FileBox
-                const newFiles: FileBoxItem[] = paths.map((path) => ({
-                  id: Math.random().toString(36).substr(2, 9),
-                  path,
-                  checked: true,
-                }));
+          const viewportX = position.x / scaleFactor;
+          const viewportY = position.y / scaleFactor - scrollOffset;
 
-                appStore.setCurrentFile({
-                  order: currentFile.order,
-                  text_boxes: currentFile.text_boxes,
-                  file_boxes: currentFile.file_boxes,
-                  file_box_data: {
-                    ...(currentFile.file_box_data || {}),
-                    [fileBoxId]: {
-                      ...fileBoxData,
-                      files: [...fileBoxData.files, ...newFiles],
-                    },
+          // 使用 getBoundingClientRect 检测 FileBox
+          const fileBoxId = findFileBoxAtPoint(viewportX, viewportY);
+
+          if (fileBoxId && currentFile) {
+            // 找到对应的 FileBox 数据
+            const fileBoxData = currentFile.file_box_data?.[fileBoxId];
+            if (fileBoxData) {
+              // 添加文件到 FileBox
+              const newFiles: FileBoxItem[] = paths.map((path) => ({
+                id: Math.random().toString(36).substr(2, 9),
+                path,
+                checked: true,
+              }));
+
+              appStore.setCurrentFile({
+                order: currentFile.order,
+                text_boxes: currentFile.text_boxes,
+                file_boxes: currentFile.file_boxes,
+                file_box_data: {
+                  ...(currentFile.file_box_data || {}),
+                  [fileBoxId]: {
+                    ...fileBoxData,
+                    files: [...fileBoxData.files, ...newFiles],
                   },
-                  variants: currentFile.variants,
-                  separators: currentFile.separators,
-                });
-              }
+                },
+                variants: currentFile.variants,
+                separators: currentFile.separators,
+              });
             }
           }
           // 重置拖放状态
