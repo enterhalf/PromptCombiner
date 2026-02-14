@@ -1,11 +1,11 @@
 [package]
 name = "prompt-combiner"
-version = "1.2.3"
+version = "1.2.4"
 description = "Cross-platform Prompt Combiner"
-authors = ["you"]
-license = ""
-repository = ""
-edition = "2021"
+authors = ["enterhalf"]
+license = "MIT"
+repository = "https://github.com/enterhalf/PromptCombiner"
+edition = "2026"
 rust-version = "1.70"
 
 [build-dependencies]

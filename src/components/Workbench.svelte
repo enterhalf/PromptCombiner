@@ -55,10 +55,10 @@
     if ($appStore.generatedText) {
       try {
         await navigator.clipboard.writeText($appStore.generatedText);
-        alert("Copied to clipboard!");
+        appStore.showToast("Copied to clipboard!", "success");
       } catch (error) {
         console.error("Failed to copy:", error);
-        alert("Failed to copy to clipboard");
+        appStore.showToast("Failed to copy to clipboard", "error");
       }
     }
   }
@@ -322,7 +322,7 @@
         <button
           on:click={async () => {
             await navigator.clipboard.writeText($appStore.generatedText);
-            alert("Copied to clipboard!");
+            appStore.showToast("Copied to clipboard!", "success");
           }}
           class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
         >
