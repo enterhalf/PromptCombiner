@@ -352,18 +352,18 @@
       </select>
 
       <button
-        on:click={handleDeleteVariant}
-        class="text-orange-400 hover:text-orange-300 px-2 py-1 rounded hover:bg-orange-900/30 text-xs"
-        title="Delete Variant"
-      >
-        🗑
-      </button>
-      <button
         on:click={handleAddVariant}
         class="text-green-400 hover:text-green-300 px-2 py-1 rounded hover:bg-green-900/30 text-xs"
         title="Add Variant"
       >
         ➕
+      </button>
+      <button
+        on:click={handleDeleteVariant}
+        class="text-orange-400 hover:text-orange-300 px-2 py-1 rounded hover:bg-orange-900/30 text-xs"
+        title="Delete Variant"
+      >
+        🗑
       </button>
       <button
         on:click={handleDelete}
