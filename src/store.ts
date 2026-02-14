@@ -58,6 +58,7 @@ const defaultState: AppState = {
   generatedText: "",
   showGeneratedModal: false,
   recentWorkspaces: getStoredRecentWorkspaces(),
+  toasts: [],
 };
 
 let autoSaveTimeout: number | null = null;
@@ -261,6 +262,20 @@ function createAppStore() {
       update((s) => ({ ...s, generatedText: text })),
     setShowGeneratedModal: (show: boolean) =>
       update((s) => ({ ...s, showGeneratedModal: show })),
+    showToast: (message: string, type: "success" | "error" | "info" = "info") => {
+      const id = Math.random().toString(36).substr(2, 9);
+      update((s) => ({
+        ...s,
+        toasts: [...s.toasts, { id, message, type }],
+      }));
+      // 3秒后自动移除
+      setTimeout(() => {
+        update((s) => ({
+          ...s,
+          toasts: s.toasts.filter((t) => t.id !== id),
+        }));
+      }, 3000);
+    },
     removeRecentWorkspace: (path: string) => {
       update((s) => {
         const newRecentWorkspaces = s.recentWorkspaces.filter(

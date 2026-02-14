@@ -56,6 +56,12 @@ export interface WorkspaceItem {
   is_file: boolean;
 }
 
+export interface Toast {
+  id: string;
+  message: string;
+  type: "success" | "error" | "info";
+}
+
 export interface AppState {
   workspacePath: string;
   currentFile: PromptFile | null;
@@ -65,6 +71,7 @@ export interface AppState {
   generatedText: string;
   showGeneratedModal: boolean;
   recentWorkspaces: string[];
+  toasts: Toast[];
 }
 
 // 框体类型，为未来扩展预留
