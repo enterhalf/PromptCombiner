@@ -1,6 +1,7 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
   import { createEventDispatcher } from "svelte";
+  import { appStore } from "../store";
   import type { TextBox, VariantData, Variant } from "../types";
 
   export let textBox: TextBox;
@@ -159,27 +160,25 @@
 
   function handleDeleteVariant() {
     if (totalVariants <= 1) {
-      alert("Cannot delete the last variant");
+      appStore.showToast("Cannot delete the last variant", "error");
       return;
     }
 
-    if (confirm("Delete this variant?")) {
-      const newVariants = [...(variantData.variants || [])];
-      newVariants.splice(currentVariantIndex, 1);
-      const newTotalVariants = totalVariants - 1;
-      let newIndex = currentVariantIndex;
-      if (currentVariantIndex >= newTotalVariants) {
-        newIndex = newTotalVariants - 1;
-      }
-      dispatch("variantschange", {
-        id: textBox.id,
-        variantData: {
-          ...variantData,
-          variants: newVariants,
-          current_variant_index: newIndex,
-        },
-      });
+    const newVariants = [...(variantData.variants || [])];
+    newVariants.splice(currentVariantIndex, 1);
+    const newTotalVariants = totalVariants - 1;
+    let newIndex = currentVariantIndex;
+    if (currentVariantIndex >= newTotalVariants) {
+      newIndex = newTotalVariants - 1;
     }
+    dispatch("variantschange", {
+      id: textBox.id,
+      variantData: {
+        ...variantData,
+        variants: newVariants,
+        current_variant_index: newIndex,
+      },
+    });
   }
 
   function handleAddVariant() {

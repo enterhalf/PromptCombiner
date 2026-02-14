@@ -71,11 +71,15 @@
         errorMessage.includes("not allowed") ||
         errorMessage.includes("Tauri")
       ) {
-        alert(
-          "This feature is only available in the Tauri desktop app. Please run the app using 'npm run tauri dev' instead of 'npm run dev'."
+        appStore.showToast(
+          "This feature is only available in the Tauri desktop app",
+          "error"
         );
       } else {
-        alert(`Failed to select workspace: ${errorMessage}`);
+        appStore.showToast(
+          `Failed to select workspace: ${errorMessage}`,
+          "error"
+        );
       }
     }
   }
@@ -120,7 +124,7 @@
         appStore.setCurrentFile(promptFile, item.name, true);
       } catch (error) {
         console.error("Failed to load file:", error);
-        alert("Failed to load file");
+        appStore.showToast("Failed to load file", "error");
       }
     }
   }
@@ -143,7 +147,7 @@
         }
       } catch (error) {
         console.error("Failed to create file:", error);
-        alert("Failed to create file");
+        appStore.showToast("Failed to create file", "error");
       }
     }
   }
@@ -164,7 +168,7 @@
         renameName = "";
       } catch (error) {
         console.error("Failed to rename file:", error);
-        alert("Failed to rename file");
+        appStore.showToast("Failed to rename file", "error");
       }
     }
   }
@@ -185,7 +189,7 @@
         copyName = "";
       } catch (error) {
         console.error("Failed to copy file:", error);
-        alert("Failed to copy file");
+        appStore.showToast("Failed to copy file", "error");
       }
     }
   }
@@ -205,7 +209,7 @@
       deleteItem = null;
     } catch (error) {
       console.error("Failed to delete file:", error);
-      alert("Failed to delete file");
+      appStore.showToast("Failed to delete file", "error");
     }
   }
 
@@ -522,7 +526,9 @@
     <div class="bg-gray-800 rounded-lg p-6 w-96">
       <h2 class="text-white text-lg font-bold mb-4">Confirm Delete</h2>
       <p class="text-gray-300 mb-4">
-        Are you sure you want to delete <span class="text-white font-semibold">{deleteItem.name}</span>?
+        Are you sure you want to delete <span class="text-white font-semibold"
+          >{deleteItem.name}</span
+        >?
       </p>
       <div class="flex justify-end gap-2">
         <button

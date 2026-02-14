@@ -302,9 +302,9 @@
       // 使用 store 中的保存方法，它会自动处理标题清理
       const success = await appStore.saveCurrentFile();
       if (success) {
-        alert("File saved successfully!");
+        appStore.showToast("File saved successfully!", "success");
       } else {
-        alert("Failed to save file");
+        appStore.showToast("Failed to save file", "error");
       }
     } catch (error) {
       const errorMessage =
@@ -312,11 +312,12 @@
       console.error("Failed to save:", error);
 
       if (errorMessage.includes("Tauri") || errorMessage.includes("invoke")) {
-        alert(
-          'This feature is only available in the Tauri desktop app. Please run the app using "npm run tauri dev" instead of "npm run dev".'
+        appStore.showToast(
+          "This feature is only available in the Tauri desktop app",
+          "error"
         );
       } else {
-        alert(`Failed to save file: ${errorMessage}`);
+        appStore.showToast(`Failed to save file: ${errorMessage}`, "error");
       }
     }
   }
@@ -515,10 +516,17 @@
 
 <!-- Toast 通知容器 -->
 {#if $appStore.toasts.length > 0}
-  <div class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none">
+  <div
+    class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"
+  >
     {#each $appStore.toasts as toast (toast.id)}
       <div
-        class="px-4 py-2 rounded-lg shadow-lg text-white font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 {toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'}"
+        class="px-4 py-2 rounded-lg shadow-lg text-white font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 {toast.type ===
+        'success'
+          ? 'bg-green-600'
+          : toast.type === 'error'
+            ? 'bg-red-600'
+            : 'bg-blue-600'}"
       >
         {toast.message}
       </div>
