@@ -196,6 +196,14 @@
 
   function handleDeleteClick(e: Event, item: WorkspaceItem) {
     e.stopPropagation();
+    // 检查要删除的文件是否是当前加载的配置文件
+    if (item.name === $appStore.currentFileName) {
+      appStore.showToast(
+        "Cannot delete currently loaded files, please switch configuration files before deletion.",
+        "error"
+      );
+      return;
+    }
     deleteItem = item;
     showDeleteDialog = true;
   }
