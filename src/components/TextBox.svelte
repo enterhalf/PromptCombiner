@@ -167,10 +167,8 @@
     const newVariants = [...(variantData.variants || [])];
     newVariants.splice(currentVariantIndex, 1);
     const newTotalVariants = totalVariants - 1;
-    let newIndex = currentVariantIndex;
-    if (currentVariantIndex >= newTotalVariants) {
-      newIndex = newTotalVariants - 1;
-    }
+    // 删除后回到上一个索引位置，如果当前是第一个则保持在第一个
+    let newIndex = Math.max(0, currentVariantIndex - 1);
     dispatch("variantschange", {
       id: textBox.id,
       variantData: {
@@ -182,18 +180,36 @@
   }
 
   function handleAddVariant() {
-    // 复制当前变体的内容和标题
+    // 生成新变体标题
+    let newTitle = "";
+    if (currentTitle && currentTitle.trim()) {
+      // 匹配末尾的数字
+      const match = currentTitle.match(/^(.*?)(\d+)$/);
+      if (match) {
+        // 末尾是数字，数字+1
+        const prefix = match[1];
+        const num = parseInt(match[2], 10) + 1;
+        newTitle = prefix + num;
+      } else {
+        // 末尾没有数字，添加2
+        newTitle = currentTitle + "2";
+      }
+    }
+
     const newVariant: Variant = {
       content: currentContent,
-      title: currentTitle || "", // 复制当前标题（可能是空的）
+      title: newTitle,
     };
-    const newVariants = [...(variantData.variants || []), newVariant];
+    // 在当前变体右侧插入新变体
+    const newVariants = [...(variantData.variants || [])];
+    const insertIndex = currentVariantIndex + 1;
+    newVariants.splice(insertIndex, 0, newVariant);
     dispatch("variantschange", {
       id: textBox.id,
       variantData: {
         ...variantData,
         variants: newVariants,
-        current_variant_index: newVariants.length - 1,
+        current_variant_index: insertIndex,
       },
     });
   }
