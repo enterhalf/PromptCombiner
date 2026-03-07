@@ -6,6 +6,9 @@
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
   import FileBox from "./components/FileBox.svelte";
+  import { save } from "@tauri-apps/plugin-dialog";
+  import { basename, dirname } from "@tauri-apps/api/path";
+  import { createPromptFile } from "./tauri-api";
   import type {
     TextBox as TextBoxType,
     FileBox as FileBoxType,
@@ -18,6 +21,11 @@
   $: currentFile = $appStore.currentFile;
   $: canUndo = $historyManager.past.length > 0;
   $: canRedo = $historyManager.future.length > 0;
+
+  function getFileName(path: string): string {
+    const parts = path.split(/[/\\]/);
+    return parts[parts.length - 1] || path;
+  }
 
   // 跟踪哪个 FileBox 正在被拖放文件
   let activeDragOverFileBoxId: string | null = null;
@@ -294,15 +302,50 @@
   }
 
   async function handleSave() {
-    if (!currentFile || !$appStore.currentFilePath) return;
+    if (!currentFile) return;
 
     try {
-      // 使用 store 中的保存方法，它会自动处理标题清理
-      const success = await appStore.saveCurrentFile();
-      if (success) {
-        appStore.showToast("File saved successfully!", "success");
+      if (!$appStore.currentFilePath) {
+        // 临时文件，需要选择保存路径
+        const selectedPath = await save({
+          title: "保存 Prompt 文件",
+          defaultPath: "untitled.prompt",
+          filters: [{ name: "Prompt Files", extensions: ["prompt"] }],
+        });
+        
+        if (!selectedPath || typeof selectedPath !== "string") {
+          return;
+        }
+        
+        const dirPath = await dirname(selectedPath);
+        const fileNameWithExt = $appStore.currentFileName !== "Untitled" 
+          ? $appStore.currentFileName 
+          : getFileName(selectedPath);
+        const fileName = fileNameWithExt.replace(/\.prompt$/, "");
+        
+        // 创建文件并保存
+        const filePath = await createPromptFile(dirPath, fileName);
+        appStore.setCurrentFilePath(filePath);
+        appStore.setCurrentFileName(fileNameWithExt);
+        appStore.updateActiveTabInfo(fileNameWithExt, filePath);
+        
+        const success = await appStore.saveCurrentFile();
+        if (success) {
+          appStore.markTabSaved();
+          appStore.addRecentFile(filePath);
+          appStore.showToast("File saved successfully!", "success");
+        } else {
+          appStore.showToast("Failed to save file", "error");
+        }
       } else {
-        appStore.showToast("Failed to save file", "error");
+        // 已有文件，直接保存
+        const success = await appStore.saveCurrentFile();
+        if (success) {
+          appStore.markTabSaved();
+          appStore.showToast("File saved successfully!", "success");
+        } else {
+          appStore.showToast("Failed to save file", "error");
+        }
       }
     } catch (error) {
       const errorMessage =
@@ -391,6 +434,12 @@
     ) {
       e.preventDefault();
       appStore.redo();
+    }
+    
+    // Ctrl+S 保存
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault();
+      handleSave();
     }
   }
 
@@ -529,34 +578,62 @@
   <Sidebar />
 
   <div class="flex-1 flex flex-col h-full overflow-hidden">
-    {#if currentFile}
-      <div
-        class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-center justify-between"
-      >
-        <div class="flex items-center gap-3">
-          <h2 class="text-white font-bold">{$appStore.currentFileName}</h2>
-          <div class="flex items-center gap-1">
+    <!-- 标签栏 -->
+    <div class="bg-gray-800 border-b border-gray-700 flex items-center">
+      <div class="flex items-center overflow-x-auto flex-1">
+        {#each $appStore.tabs as tab (tab.id)}
+          <div
+            class="flex items-center bg-gray-900 border-r border-gray-700 px-3 py-2 cursor-pointer min-w-[160px] max-w-[240px] group {$appStore.activeTabId === tab.id ? 'bg-gray-800' : 'hover:bg-gray-850'}"
+            on:click={() => appStore.switchTab(tab.id)}
+          >
+            <span class="text-white text-sm truncate flex-1 mr-2">
+              {tab.fileName}
+              {#if tab.isUnsaved}
+                <span class="text-yellow-400 ml-1">•</span>
+              {/if}
+            </span>
             <button
-              on:click={() => appStore.undo()}
-              disabled={!canUndo}
-              class="px-2 py-1 rounded text-sm transition-colors {canUndo
-                ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                : 'text-gray-600 cursor-not-allowed'}"
-              title="Undo (Ctrl+Z)"
+              class="text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              on:click|stopPropagation={() => appStore.closeTab(tab.id)}
+              title="关闭"
             >
-              ←
-            </button>
-            <button
-              on:click={() => appStore.redo()}
-              disabled={!canRedo}
-              class="px-2 py-1 rounded text-sm transition-colors {canRedo
-                ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                : 'text-gray-600 cursor-not-allowed'}"
-              title="Redo (Ctrl+Y)"
-            >
-              →
+              ×
             </button>
           </div>
+        {/each}
+      </div>
+      <!-- 空白区域可双击新建标签 -->
+      <div
+        class="flex-1 h-full cursor-default"
+        on:dblclick={() => appStore.createNewTab()}
+      />
+    </div>
+    
+    {#if currentFile}
+      <div
+        class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-end"
+      >
+        <div class="flex items-center gap-1">
+          <button
+            on:click={() => appStore.undo()}
+            disabled={!canUndo}
+            class="px-2 py-1 rounded text-sm transition-colors {canUndo
+              ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+              : 'text-gray-600 cursor-not-allowed'}"
+            title="Undo (Ctrl+Z)"
+          >
+            ←
+          </button>
+          <button
+            on:click={() => appStore.redo()}
+            disabled={!canRedo}
+            class="px-2 py-1 rounded text-sm transition-colors {canRedo
+              ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+              : 'text-gray-600 cursor-not-allowed'}"
+            title="Redo (Ctrl+Y)"
+          >
+            →
+          </button>
         </div>
       </div>
 
@@ -665,12 +742,21 @@
         </div>
       </div>
     {:else}
-      <div class="flex-1 flex items-center justify-center">
+      <div 
+        class="flex-1 flex items-center justify-center cursor-pointer"
+        on:dblclick={() => appStore.createNewTab()}
+      >
         <div class="text-center">
           <p class="text-gray-400 text-lg mb-4">No file selected</p>
           <p class="text-gray-500 text-sm">
-            Select a workspace and open a file from the sidebar
+            Double-click here or on the tab bar to create a new prompt
           </p>
+          <button
+            on:click={() => appStore.createNewTab()}
+            class="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+          >
+            Create New Prompt
+          </button>
         </div>
       </div>
     {/if}

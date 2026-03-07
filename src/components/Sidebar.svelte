@@ -1,13 +1,12 @@
 <script lang="ts">
   import { appStore } from "../store";
   import {
-    createPromptFile,
     loadPromptFile,
     renamePromptFile,
     deletePromptFile,
     copyPromptFile,
   } from "../tauri-api";
-  import { open, save } from "@tauri-apps/plugin-dialog";
+  import { open } from "@tauri-apps/plugin-dialog";
   import Workbench from "./Workbench.svelte";
   import { basename, dirname } from "@tauri-apps/api/path";
 
@@ -57,40 +56,10 @@
 
   async function handleOpenFile(filePath: string) {
     try {
-      await appStore.saveCurrentFile();
-
-      const promptFile = await loadPromptFile(filePath);
-      const fileName = await basename(filePath);
-
-      // 打开新文件时重置历史记录并设置初始状态
-      appStore.setCurrentFile(promptFile, fileName, filePath, true);
-      appStore.addRecentFile(filePath);
+      await appStore.openFileInTab(filePath);
     } catch (error) {
       console.error("Failed to load file:", error);
       appStore.showToast("Failed to load file", "error");
-    }
-  }
-
-  async function handleCreateFile() {
-    try {
-      const selectedPath = await save({
-        title: "新建 Prompt 文件",
-        defaultPath: "untitled.prompt",
-        filters: [{ name: "Prompt Files", extensions: ["prompt"] }],
-      });
-
-      if (selectedPath && typeof selectedPath === "string") {
-        const dirPath = await dirname(selectedPath);
-        const fileNameWithExt = getFileName(selectedPath);
-        const fileName = fileNameWithExt.replace(/\.prompt$/, "");
-
-        const filePath = await createPromptFile(dirPath, fileName);
-        appStore.addRecentFile(filePath);
-        await handleOpenFile(filePath);
-      }
-    } catch (error) {
-      console.error("Failed to create file:", error);
-      appStore.showToast("Failed to create file", "error");
     }
   }
 
@@ -311,16 +280,6 @@
             class:cursor-not-allowed={!isTauriEnv}
           >
             📂
-          </button>
-          <button
-            on:click={handleCreateFile}
-            class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-            title="新建文件"
-            disabled={!isTauriEnv}
-            class:opacity-50={!isTauriEnv}
-            class:cursor-not-allowed={!isTauriEnv}
-          >
-            +
           </button>
         </div>
       </div>

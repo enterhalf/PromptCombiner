@@ -1,6 +1,7 @@
 import { writable, get } from "svelte/store";
-import type { AppState, PromptFile, VariantData } from "./types";
-import { savePromptFile } from "./tauri-api";
+import type { AppState, PromptFile, VariantData, Tab } from "./types";
+import { savePromptFile, loadPromptFile } from "./tauri-api";
+import { basename } from "@tauri-apps/api/path";
 
 // 清理变体数据：如果标题以 "！" 或 "!" 开头，则将内容设为空字符串（不保存到本地）
 function cleanVariantDataForSave(promptFile: PromptFile): PromptFile {
@@ -49,7 +50,24 @@ function saveRecentFiles(files: string[]) {
   }
 }
 
+function generateTabId(): string {
+  return Math.random().toString(36).substr(2, 9);
+}
+
+function createEmptyPromptFile(): PromptFile {
+  return {
+    order: [],
+    variants: {},
+    text_boxes: {},
+    file_boxes: {},
+    file_box_data: {},
+    separators: [],
+  };
+}
+
 const defaultState: AppState = {
+  tabs: [],
+  activeTabId: null,
   currentFile: null,
   currentFileName: "",
   currentFilePath: "",
@@ -216,6 +234,186 @@ function createAppStore() {
         };
       });
     },
+    createNewTab: (
+      file: PromptFile | null = createEmptyPromptFile(),
+      fileName: string = "Untitled",
+      filePath: string = "",
+      isUnsaved: boolean = true
+    ) => {
+      update((s) => {
+        const newTabId = generateTabId();
+        const newTab: Tab = {
+          id: newTabId,
+          file,
+          fileName,
+          filePath,
+          isUnsaved,
+        };
+        const newTabs = [...s.tabs, newTab];
+        return {
+          ...s,
+          tabs: newTabs,
+          activeTabId: newTabId,
+          currentFile: file,
+          currentFileName: fileName,
+          currentFilePath: filePath,
+        };
+      });
+      if (file) {
+        historyManager.setPresent(file);
+      }
+    },
+    openFileInTab: async (filePath: string) => {
+      try {
+        const promptFile = await loadPromptFile(filePath);
+        const fileName = await basename(filePath);
+        
+        update((s) => {
+          const existingTab = s.tabs.find(tab => tab.filePath === filePath);
+          if (existingTab) {
+            return {
+              ...s,
+              activeTabId: existingTab.id,
+              currentFile: existingTab.file,
+              currentFileName: existingTab.fileName,
+              currentFilePath: existingTab.filePath,
+            };
+          }
+          
+          const newTabId = generateTabId();
+          const newTab: Tab = {
+            id: newTabId,
+            file: promptFile,
+            fileName,
+            filePath,
+            isUnsaved: false,
+          };
+          const newTabs = [...s.tabs, newTab];
+          
+          return {
+            ...s,
+            tabs: newTabs,
+            activeTabId: newTabId,
+            currentFile: promptFile,
+            currentFileName: fileName,
+            currentFilePath: filePath,
+          };
+        });
+        
+        appStore.addRecentFile(filePath);
+      } catch (error) {
+        console.error("Failed to load file in tab:", error);
+        appStore.showToast("Failed to load file", "error");
+      }
+    },
+    switchTab: (tabId: string) => {
+      update((s) => {
+        const tab = s.tabs.find(t => t.id === tabId);
+        if (!tab) return s;
+        
+        return {
+          ...s,
+          activeTabId: tabId,
+          currentFile: tab.file,
+          currentFileName: tab.fileName,
+          currentFilePath: tab.filePath,
+        };
+      });
+      
+      const state = get(appStore);
+      const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+      if (activeTab?.file) {
+        historyManager.setPresent(activeTab.file);
+      }
+    },
+    closeTab: (tabId: string) => {
+      update((s) => {
+        const tabIndex = s.tabs.findIndex(t => t.id === tabId);
+        if (tabIndex === -1) return s;
+        
+        const newTabs = s.tabs.filter(t => t.id !== tabId);
+        let newActiveTabId = s.activeTabId;
+        let newCurrentFile = s.currentFile;
+        let newCurrentFileName = s.currentFileName;
+        let newCurrentFilePath = s.currentFilePath;
+        
+        if (s.activeTabId === tabId) {
+          if (newTabs.length > 0) {
+            const newActiveIndex = Math.min(tabIndex, newTabs.length - 1);
+            const newActiveTab = newTabs[newActiveIndex];
+            newActiveTabId = newActiveTab.id;
+            newCurrentFile = newActiveTab.file;
+            newCurrentFileName = newActiveTab.fileName;
+            newCurrentFilePath = newActiveTab.filePath;
+          } else {
+            newActiveTabId = null;
+            newCurrentFile = null;
+            newCurrentFileName = "";
+            newCurrentFilePath = "";
+          }
+        }
+        
+        return {
+          ...s,
+          tabs: newTabs,
+          activeTabId: newActiveTabId,
+          currentFile: newCurrentFile,
+          currentFileName: newCurrentFileName,
+          currentFilePath: newCurrentFilePath,
+        };
+      });
+      
+      const state = get(appStore);
+      if (state.activeTabId) {
+        const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+        if (activeTab?.file) {
+          historyManager.setPresent(activeTab.file);
+        }
+      } else {
+        historyManager.reset();
+      }
+    },
+    markTabUnsaved: () => {
+      update((s) => {
+        if (!s.activeTabId) return s;
+        const newTabs = s.tabs.map(tab => {
+          if (tab.id === s.activeTabId) {
+            return { ...tab, file: s.currentFile, isUnsaved: true };
+          }
+          return tab;
+        });
+        return { ...s, tabs: newTabs };
+      });
+    },
+    markTabSaved: () => {
+      update((s) => {
+        if (!s.activeTabId) return s;
+        const newTabs = s.tabs.map(tab => {
+          if (tab.id === s.activeTabId) {
+            return { ...tab, isUnsaved: false };
+          }
+          return tab;
+        });
+        return { ...s, tabs: newTabs };
+      });
+    },
+    updateActiveTabInfo: (fileName?: string, filePath?: string) => {
+      update((s) => {
+        if (!s.activeTabId) return s;
+        const newTabs = s.tabs.map(tab => {
+          if (tab.id === s.activeTabId) {
+            return {
+              ...tab,
+              fileName: fileName !== undefined ? fileName : tab.fileName,
+              filePath: filePath !== undefined ? filePath : tab.filePath,
+              file: s.currentFile,
+            };
+          }
+          return tab;
+        });
+        return { ...s, tabs: newTabs };
+      });
+    },
     setCurrentFile: (
       file: PromptFile | null,
       fileName?: string,
@@ -228,6 +426,9 @@ function createAppStore() {
         currentFileName: fileName !== undefined ? fileName : s.currentFileName,
         currentFilePath: filePath !== undefined ? filePath : s.currentFilePath,
       }));
+      
+      appStore.markTabUnsaved();
+      
       // 记录历史（除非是撤销/重做操作或初始化）
       if (file && !skipHistory) {
         historyManager.push(file);

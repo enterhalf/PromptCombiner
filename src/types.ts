@@ -62,7 +62,17 @@ export interface Toast {
   type: "success" | "error" | "info";
 }
 
+export interface Tab {
+  id: string;
+  file: PromptFile | null;
+  fileName: string;
+  filePath: string;
+  isUnsaved: boolean;
+}
+
 export interface AppState {
+  tabs: Tab[];
+  activeTabId: string | null;
   currentFile: PromptFile | null;
   currentFileName: string;
   currentFilePath: string;
