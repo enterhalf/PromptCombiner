@@ -23,11 +23,11 @@
   $: canUndo = $historyManager.past.length > 0;
   $: canRedo = $historyManager.future.length > 0;
 
-  let tabList = $appStore.tabs.map(tab => ({ ...tab }));
+  let tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   let showCloseConfirmDialog = false;
   let tabToClose: string | null = null;
   $: {
-    tabList = $appStore.tabs.map(tab => ({ ...tab }));
+    tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   }
 
   function handleTabDndConsider(e: CustomEvent) {
@@ -36,7 +36,7 @@
 
   function handleTabDndFinalize(e: CustomEvent) {
     tabList = e.detail.items;
-    appStore.reorderTabs(tabList.map(tab => tab.id));
+    appStore.reorderTabs(tabList.map((tab) => tab.id));
   }
 
   function handleTabScroll(e: WheelEvent) {
@@ -51,7 +51,7 @@
   }
 
   function handleCloseTabClick(tabId: string) {
-    const tab = $appStore.tabs.find(t => t.id === tabId);
+    const tab = $appStore.tabs.find((t) => t.id === tabId);
     if (tab && tab.isUnsaved && !tab.filePath) {
       // 是未保存的临时文件，显示确认对话框
       tabToClose = tabId;
@@ -360,23 +360,24 @@
           defaultPath: "untitled.prompt",
           filters: [{ name: "Prompt Files", extensions: ["prompt"] }],
         });
-        
+
         if (!selectedPath || typeof selectedPath !== "string") {
           return;
         }
-        
+
         const dirPath = await dirname(selectedPath);
-        const fileNameWithExt = $appStore.currentFileName !== "Untitled" 
-          ? $appStore.currentFileName 
-          : getFileName(selectedPath);
+        const fileNameWithExt =
+          $appStore.currentFileName !== "Untitled"
+            ? $appStore.currentFileName
+            : getFileName(selectedPath);
         const fileName = fileNameWithExt.replace(/\.prompt$/, "");
-        
+
         // 创建文件并保存
         const filePath = await createPromptFile(dirPath, fileName);
         appStore.setCurrentFilePath(filePath);
         appStore.setCurrentFileName(fileNameWithExt);
         appStore.updateActiveTabInfo(fileNameWithExt, filePath);
-        
+
         const success = await appStore.saveCurrentFile();
         if (success) {
           appStore.markTabSaved();
@@ -402,7 +403,7 @@
 
       if (errorMessage.includes("Tauri") || errorMessage.includes("invoke")) {
         appStore.showToast(
-          'This feature is only available in the Tauri desktop app',
+          "This feature is only available in the Tauri desktop app",
           "error"
         );
       } else {
@@ -483,7 +484,7 @@
       e.preventDefault();
       appStore.redo();
     }
-    
+
     // Ctrl+S 保存
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
       e.preventDefault();
@@ -611,10 +612,17 @@
 
 <!-- Toast 通知容器 -->
 {#if $appStore.toasts.length > 0}
-  <div class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none">
+  <div
+    class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"
+  >
     {#each $appStore.toasts as toast (toast.id)}
       <div
-        class="px-4 py-2 rounded-lg shadow-lg text-white font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 {toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'}"
+        class="px-4 py-2 rounded-lg shadow-lg text-white font-medium transition-all duration-300 animate-in fade-in slide-in-from-top-2 {toast.type ===
+        'success'
+          ? 'bg-green-600'
+          : toast.type === 'error'
+            ? 'bg-red-600'
+            : 'bg-blue-600'}"
       >
         {toast.message}
       </div>
@@ -627,7 +635,7 @@
 
   <div class="flex-1 flex flex-col h-full overflow-hidden">
     <!-- 标签栏 -->
-    <div 
+    <div
       class="bg-gray-800 border-b border-gray-700 flex items-center gap-2 px-2"
       on:dblclick={() => appStore.createNewTab()}
     >
@@ -654,9 +662,9 @@
           →
         </button>
       </div>
-      
+
       <!-- 标签页 -->
-      <div 
+      <div
         class="flex-1 flex items-center overflow-x-auto scrollbar-hide"
         on:wheel={handleTabScroll}
         use:dndzone={{
@@ -669,7 +677,10 @@
       >
         {#each tabList as tab (tab.id)}
           <div
-            class="flex items-center bg-gray-900 border-r border-gray-700 px-3 py-2 cursor-pointer min-w-[160px] max-w-[240px] group flex-shrink-0 {$appStore.activeTabId === tab.id ? 'bg-gray-800' : 'hover:bg-gray-850'}"
+            class="flex items-center bg-gray-900 border-r border-gray-700 px-3 py-2 cursor-pointer min-w-[160px] max-w-[240px] group flex-shrink-0 {$appStore.activeTabId ===
+            tab.id
+              ? 'bg-gray-800'
+              : 'hover:bg-gray-850'}"
             on:click={() => appStore.switchTab(tab.id)}
           >
             <span class="text-white text-sm truncate flex-1 mr-2">
@@ -687,11 +698,19 @@
             </button>
           </div>
         {/each}
+
+        <!-- 新建按钮 -->
+        <button
+          on:click={() => appStore.createNewTab()}
+          class="flex-shrink-0 px-3 py-2 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors rounded"
+          title="新建临时文件"
+        >
+          +
+        </button>
       </div>
     </div>
-    
-    {#if currentFile}
 
+    {#if currentFile}
       <div class="flex-1 overflow-y-auto p-4">
         <div class="max-w-4xl mx-auto min-h-full">
           <!-- 第一个插入按钮（在第一个框之前） -->
@@ -820,14 +839,9 @@
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
     on:click={cancelCloseTab}
   >
-    <div
-      class="bg-gray-800 rounded-lg p-6 w-96"
-      on:click|stopPropagation
-    >
+    <div class="bg-gray-800 rounded-lg p-6 w-96" on:click|stopPropagation>
       <h2 class="text-white text-lg font-bold mb-4">确认关闭</h2>
-      <p class="text-gray-300 mb-4">
-        此文件尚未保存，确定要关闭吗？
-      </p>
+      <p class="text-gray-300 mb-4">此文件尚未保存，确定要关闭吗？</p>
       <div class="flex justify-end gap-2">
         <button
           on:click={cancelCloseTab}
