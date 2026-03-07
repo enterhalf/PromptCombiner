@@ -24,6 +24,8 @@
   $: canRedo = $historyManager.future.length > 0;
 
   let tabList = $appStore.tabs.map(tab => ({ ...tab }));
+  let showCloseConfirmDialog = false;
+  let tabToClose: string | null = null;
   $: {
     tabList = $appStore.tabs.map(tab => ({ ...tab }));
   }
@@ -46,6 +48,31 @@
   function getFileName(path: string): string {
     const parts = path.split(/[/\\]/);
     return parts[parts.length - 1] || path;
+  }
+
+  function handleCloseTabClick(tabId: string) {
+    const tab = $appStore.tabs.find(t => t.id === tabId);
+    if (tab && tab.isUnsaved && !tab.filePath) {
+      // 是未保存的临时文件，显示确认对话框
+      tabToClose = tabId;
+      showCloseConfirmDialog = true;
+    } else {
+      // 不是临时文件或已保存，直接关闭
+      appStore.closeTab(tabId);
+    }
+  }
+
+  function confirmCloseTab() {
+    if (tabToClose) {
+      appStore.closeTab(tabToClose);
+      showCloseConfirmDialog = false;
+      tabToClose = null;
+    }
+  }
+
+  function cancelCloseTab() {
+    showCloseConfirmDialog = false;
+    tabToClose = null;
   }
 
   // 跟踪哪个 FileBox 正在被拖放文件
@@ -653,7 +680,7 @@
             </span>
             <button
               class="text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-              on:click|stopPropagation={() => appStore.closeTab(tab.id)}
+              on:click|stopPropagation={() => handleCloseTabClick(tab.id)}
               title="关闭"
             >
               ×
@@ -787,3 +814,34 @@
     {/if}
   </div>
 </div>
+
+{#if showCloseConfirmDialog}
+  <div
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    on:click={cancelCloseTab}
+  >
+    <div
+      class="bg-gray-800 rounded-lg p-6 w-96"
+      on:click|stopPropagation
+    >
+      <h2 class="text-white text-lg font-bold mb-4">确认关闭</h2>
+      <p class="text-gray-300 mb-4">
+        此文件尚未保存，确定要关闭吗？
+      </p>
+      <div class="flex justify-end gap-2">
+        <button
+          on:click={cancelCloseTab}
+          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
+        >
+          取消
+        </button>
+        <button
+          on:click={confirmCloseTab}
+          class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+        >
+          确认关闭
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
