@@ -409,13 +409,7 @@
       {/each}
     </div>
 
-    {#if totalVariants > 1}
-      <div
-        class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded"
-      >
-        {currentVariantIndex + 1} / {totalVariants}
-      </div>
-    {/if}
+
   </div>
 
   <div
