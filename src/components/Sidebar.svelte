@@ -22,6 +22,11 @@
   let copyName = "";
   let showDeleteDialog = false;
   let deletePath: string | null = null;
+  // Context menu state
+  let contextMenuVisible = false;
+  let contextMenuX = 0;
+  let contextMenuY = 0;
+  let contextMenuFilePath: string | null = null;
   // Tauri v2 检测
   let isTauriEnv =
     typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -44,10 +49,10 @@
   }
 
   function getShortPath(path: string): string {
-    if (path.length <= 35) return path;
+    if (path.length <= 45) return path;
     const parts = path.split(/[/\\]/);
-    if (parts.length <= 2) return path;
-    return ".../" + parts.slice(-2).join("/");
+    if (parts.length <= 3) return path;
+    return ".../" + parts.slice(-3).join("/");
   }
 
   async function handleOpenFile(filePath: string) {
@@ -107,11 +112,27 @@
     }
   }
 
-  function handleRenameClick(filePath: string) {
-    renamePath = filePath;
-    const fileName = getFileName(filePath).replace(".prompt", "");
+  function handleContextMenu(e: MouseEvent, filePath: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    contextMenuFilePath = filePath;
+    contextMenuX = e.clientX;
+    contextMenuY = e.clientY;
+    contextMenuVisible = true;
+  }
+
+  function hideContextMenu() {
+    contextMenuVisible = false;
+    contextMenuFilePath = null;
+  }
+
+  function handleRenameClick() {
+    if (!contextMenuFilePath) return;
+    renamePath = contextMenuFilePath;
+    const fileName = getFileName(renamePath).replace(".prompt", "");
     renameName = fileName;
     showRenameDialog = true;
+    hideContextMenu();
   }
 
   async function handleRename() {
@@ -136,11 +157,13 @@
     }
   }
 
-  function handleCopyClick(filePath: string) {
-    copyPath = filePath;
-    const fileName = getFileName(filePath).replace(".prompt", "");
+  function handleCopyClick() {
+    if (!contextMenuFilePath) return;
+    copyPath = contextMenuFilePath;
+    const fileName = getFileName(copyPath).replace(".prompt", "");
     copyName = fileName + "_copy";
     showCopyDialog = true;
+    hideContextMenu();
   }
 
   async function handleCopy() {
@@ -157,18 +180,20 @@
     }
   }
 
-  function handleDeleteClick(e: Event, filePath: string) {
-    e.stopPropagation();
+  function handleDeleteClick() {
+    if (!contextMenuFilePath) return;
     // 检查要删除的文件是否是当前加载的配置文件
-    if (filePath === $appStore.currentFilePath) {
+    if (contextMenuFilePath === $appStore.currentFilePath) {
       appStore.showToast(
         "Cannot delete currently loaded files, please switch configuration files before deletion.",
         "error"
       );
+      hideContextMenu();
       return;
     }
-    deletePath = filePath;
+    deletePath = contextMenuFilePath;
     showDeleteDialog = true;
+    hideContextMenu();
   }
 
   async function confirmDelete() {
@@ -187,6 +212,12 @@
   function cancelDelete() {
     showDeleteDialog = false;
     deletePath = null;
+  }
+
+  function handleRemoveFromHistoryClick() {
+    if (!contextMenuFilePath) return;
+    appStore.removeRecentFile(contextMenuFilePath);
+    hideContextMenu();
   }
 
   function handleResizeStart(e: MouseEvent) {
@@ -220,7 +251,11 @@
   }
 </script>
 
-<svelte:window on:mousemove={handleResizeMove} on:mouseup={handleResizeEnd} />
+<svelte:window
+  on:mousemove={handleResizeMove}
+  on:mouseup={handleResizeEnd}
+  on:click={hideContextMenu}
+/>
 
 <div
   class="w-64 bg-gray-900 border-r border-gray-700 flex flex-col h-full sidebar-container"
@@ -301,56 +336,25 @@
 
     <div class="flex-1 overflow-y-auto p-2">
       {#if recentFiles.length > 0}
-        <div class="text-gray-400 text-xs mb-2 px-1">最近打开</div>
+        <div class="text-gray-400 text-xs mb-1 px-1">最近打开</div>
         {#each recentFiles as filePath}
           <div
-            class="flex items-center justify-between p-2 rounded hover:bg-gray-800 cursor-pointer mb-1 group"
+            class="flex items-center p-1.5 rounded hover:bg-gray-800 cursor-pointer mb-0.5"
             role="button"
             tabindex="0"
             on:click={() => handleOpenFile(filePath)}
             on:keydown={(e) => e.key === "Enter" && handleOpenFile(filePath)}
+            on:contextmenu={(e) => handleContextMenu(e, filePath)}
             title={filePath}
           >
-            <div class="flex items-center flex-1 min-w-0">
-              <span class="mr-2">📄</span>
-              <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-gray-300 text-sm truncate">
-                  {getFileName(filePath)}
-                </span>
-                <span class="text-gray-500 text-xs truncate">
-                  {getShortPath(filePath)}
-                </span>
-              </div>
-            </div>
-            <div class="flex gap-1 opacity-0 group-hover:opacity-100">
-              <button
-                on:click|stopPropagation={() => handleRenameClick(filePath)}
-                class="text-gray-400 hover:text-white px-1"
-                title="重命名"
-              >
-                ✎
-              </button>
-              <button
-                on:click|stopPropagation={() => handleCopyClick(filePath)}
-                class="text-gray-400 hover:text-white px-1"
-                title="复制"
-              >
-                📋
-              </button>
-              <button
-                on:click={(e) => handleDeleteClick(e, filePath)}
-                class="text-gray-400 hover:text-red-400 px-1"
-                title="删除"
-              >
-                🗑
-              </button>
-              <button
-                on:click|stopPropagation={() => appStore.removeRecentFile(filePath)}
-                class="text-gray-500 hover:text-red-400 px-1.5 py-0.5 rounded transition-opacity"
-                title="从历史记录中移除"
-              >
-                ✕
-              </button>
+            <span class="mr-1.5 text-xs">📄</span>
+            <div class="flex flex-col flex-1 min-w-0">
+              <span class="text-gray-300 text-xs truncate">
+                {getFileName(filePath)}
+              </span>
+              <span class="text-gray-500 text-[10px] truncate">
+                {getShortPath(filePath)}
+              </span>
             </div>
           </div>
         {/each}
@@ -365,6 +369,41 @@
       {/if}
     </div>
   </div>
+
+  <!-- Context Menu -->
+  {#if contextMenuVisible}
+    <div
+      class="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl min-w-[160px]"
+      style="left: {contextMenuX}px; top: {contextMenuY}px;"
+      on:click|stopPropagation
+    >
+      <button
+        on:click={handleRenameClick}
+        class="w-full px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-gray-700 hover:text-white rounded-t-lg transition-colors"
+      >
+        重命名
+      </button>
+      <button
+        on:click={handleCopyClick}
+        class="w-full px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+      >
+        复制
+      </button>
+      <button
+        on:click={handleDeleteClick}
+        class="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors"
+      >
+        删除
+      </button>
+      <div class="border-t border-gray-700 my-0.5"></div>
+      <button
+        on:click={handleRemoveFromHistoryClick}
+        class="w-full px-3 py-1.5 text-left text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-300 rounded-b-lg transition-colors"
+      >
+        从历史记录移除
+      </button>
+    </div>
+  {/if}
 </div>
 
 {#if showRenameDialog && renamePath}
