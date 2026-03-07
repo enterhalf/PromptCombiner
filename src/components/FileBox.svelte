@@ -96,14 +96,12 @@
     if (!fullPath) return "";
     if (pathSegments < 1) return fullPath;
 
-    // 统一使用正斜杠处理路径
     const normalizedPath = fullPath.replace(/\\/g, "/");
     const parts = normalizedPath.split("/").filter((p) => p.length > 0);
 
-    if (parts.length <= pathSegments) return fullPath;
+    if (parts.length <= pathSegments) return "";
 
-    // 保留最后 path_segments 个分段
-    const displayParts = parts.slice(-pathSegments);
+    const displayParts = parts.slice(pathSegments);
     return displayParts.join("/");
   }
 
