@@ -294,11 +294,9 @@
   }
 
   async function handleSave() {
-    if (!currentFile || !$appStore.workspacePath || !$appStore.currentFileName)
-      return;
+    if (!currentFile || !$appStore.currentFilePath) return;
 
     try {
-      const filePath = `${$appStore.workspacePath}/${$appStore.currentFileName}`;
       // 使用 store 中的保存方法，它会自动处理标题清理
       const success = await appStore.saveCurrentFile();
       if (success) {

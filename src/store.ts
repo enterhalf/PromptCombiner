@@ -1,5 +1,5 @@
 import { writable, get } from "svelte/store";
-import type { AppState, PromptFile, WorkspaceItem, VariantData } from "./types";
+import type { AppState, PromptFile, VariantData } from "./types";
 import { savePromptFile } from "./tauri-api";
 
 // 清理变体数据：如果标题以 "！" 或 "!" 开头，则将内容设为空字符串（不保存到本地）
@@ -26,38 +26,37 @@ function cleanVariantDataForSave(promptFile: PromptFile): PromptFile {
   };
 }
 
-const RECENT_WORKSPACES_KEY = "prompt-combiner-recent-workspaces";
-const MAX_RECENT_WORKSPACES = 10;
+const RECENT_FILES_KEY = "prompt-combiner-recent-files";
+const MAX_RECENT_FILES = 10;
 const MAX_HISTORY_STEPS = 64;
 
-function getStoredRecentWorkspaces(): string[] {
+function getStoredRecentFiles(): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const stored = localStorage.getItem(RECENT_WORKSPACES_KEY);
+    const stored = localStorage.getItem(RECENT_FILES_KEY);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
   }
 }
 
-function saveRecentWorkspaces(workspaces: string[]) {
+function saveRecentFiles(files: string[]) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(RECENT_WORKSPACES_KEY, JSON.stringify(workspaces));
+    localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(files));
   } catch (error) {
-    console.error("Failed to save recent workspaces:", error);
+    console.error("Failed to save recent files:", error);
   }
 }
 
 const defaultState: AppState = {
-  workspacePath: "",
   currentFile: null,
   currentFileName: "",
-  workspaceItems: [],
+  currentFilePath: "",
   activeTab: "files",
   generatedText: "",
   showGeneratedModal: false,
-  recentWorkspaces: getStoredRecentWorkspaces(),
+  recentFiles: getStoredRecentFiles(),
   toasts: [],
 };
 
@@ -152,11 +151,10 @@ function createAppStore() {
 
   async function autoSave() {
     const state = get(appStore);
-    if (state.currentFile && state.workspacePath && state.currentFileName) {
+    if (state.currentFile && state.currentFilePath) {
       try {
-        const filePath = `${state.workspacePath}/${state.currentFileName}`;
         const cleanedFile = cleanVariantDataForSave(state.currentFile);
-        await savePromptFile(filePath, cleanedFile);
+        await savePromptFile(state.currentFilePath, cleanedFile);
       } catch (error) {
         console.error("Auto-save failed:", error);
       }
@@ -188,34 +186,47 @@ function createAppStore() {
     return false;
   }
 
+  async function saveCurrentFile() {
+    const state = get(appStore);
+    if (state.currentFile && state.currentFilePath) {
+      try {
+        const cleanedFile = cleanVariantDataForSave(state.currentFile);
+        await savePromptFile(state.currentFilePath, cleanedFile);
+        return true;
+      } catch (error) {
+        console.error("Save failed:", error);
+        return false;
+      }
+    }
+    return false;
+  }
+
   return {
     subscribe,
-    setWorkspacePath: (path: string) => {
+    addRecentFile: (filePath: string) => {
       update((s) => {
-        let newRecentWorkspaces = s.recentWorkspaces;
-        if (path) {
-          newRecentWorkspaces = [
-            path,
-            ...s.recentWorkspaces.filter((w) => w !== path),
-          ].slice(0, MAX_RECENT_WORKSPACES);
-          saveRecentWorkspaces(newRecentWorkspaces);
-        }
+        const newRecentFiles = [
+          filePath,
+          ...s.recentFiles.filter((f) => f !== filePath),
+        ].slice(0, MAX_RECENT_FILES);
+        saveRecentFiles(newRecentFiles);
         return {
           ...s,
-          workspacePath: path,
-          recentWorkspaces: newRecentWorkspaces,
+          recentFiles: newRecentFiles,
         };
       });
     },
     setCurrentFile: (
       file: PromptFile | null,
       fileName?: string,
+      filePath?: string,
       skipHistory = false
     ) => {
       update((s) => ({
         ...s,
         currentFile: file,
         currentFileName: fileName !== undefined ? fileName : s.currentFileName,
+        currentFilePath: filePath !== undefined ? filePath : s.currentFilePath,
       }));
       // 记录历史（除非是撤销/重做操作或初始化）
       if (file && !skipHistory) {
@@ -254,8 +265,8 @@ function createAppStore() {
     },
     setCurrentFileName: (fileName: string) =>
       update((s) => ({ ...s, currentFileName: fileName })),
-    setWorkspaceItems: (items: WorkspaceItem[]) =>
-      update((s) => ({ ...s, workspaceItems: items })),
+    setCurrentFilePath: (filePath: string) =>
+      update((s) => ({ ...s, currentFilePath: filePath })),
     setActiveTab: (tab: "files" | "workbench") =>
       update((s) => ({ ...s, activeTab: tab })),
     setGeneratedText: (text: string) =>
@@ -276,13 +287,11 @@ function createAppStore() {
         }));
       }, 3000);
     },
-    removeRecentWorkspace: (path: string) => {
+    removeRecentFile: (filePath: string) => {
       update((s) => {
-        const newRecentWorkspaces = s.recentWorkspaces.filter(
-          (w) => w !== path
-        );
-        saveRecentWorkspaces(newRecentWorkspaces);
-        return { ...s, recentWorkspaces: newRecentWorkspaces };
+        const newRecentFiles = s.recentFiles.filter((f) => f !== filePath);
+        saveRecentFiles(newRecentFiles);
+        return { ...s, recentFiles: newRecentFiles };
       });
     },
     reset: () => set(defaultState),
