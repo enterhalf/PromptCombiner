@@ -414,6 +414,12 @@ function createAppStore() {
         return { ...s, tabs: newTabs };
       });
     },
+    reorderTabs: (tabIds: string[]) => {
+      update((s) => {
+        const newTabs = tabIds.map(id => s.tabs.find(tab => tab.id === id)).filter(Boolean) as Tab[];
+        return { ...s, tabs: newTabs };
+      });
+    },
     setCurrentFile: (
       file: PromptFile | null,
       fileName?: string,

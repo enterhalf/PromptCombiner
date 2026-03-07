@@ -16,11 +16,32 @@
     Variant,
     BoxType,
     FileBoxItem,
+    Tab,
   } from "./types";
 
   $: currentFile = $appStore.currentFile;
   $: canUndo = $historyManager.past.length > 0;
   $: canRedo = $historyManager.future.length > 0;
+
+  let tabList = $appStore.tabs.map(tab => ({ ...tab }));
+  $: {
+    tabList = $appStore.tabs.map(tab => ({ ...tab }));
+  }
+
+  function handleTabDndConsider(e: CustomEvent) {
+    tabList = e.detail.items;
+  }
+
+  function handleTabDndFinalize(e: CustomEvent) {
+    tabList = e.detail.items;
+    appStore.reorderTabs(tabList.map(tab => tab.id));
+  }
+
+  function handleTabScroll(e: WheelEvent) {
+    e.preventDefault();
+    const container = e.currentTarget as HTMLElement;
+    container.scrollLeft += e.deltaY;
+  }
 
   function getFileName(path: string): string {
     const parts = path.split(/[/\\]/);
@@ -579,11 +600,49 @@
 
   <div class="flex-1 flex flex-col h-full overflow-hidden">
     <!-- 标签栏 -->
-    <div class="bg-gray-800 border-b border-gray-700 flex items-center">
-      <div class="flex items-center overflow-x-auto flex-1">
-        {#each $appStore.tabs as tab (tab.id)}
+    <div 
+      class="bg-gray-800 border-b border-gray-700 flex items-center gap-2 px-2"
+      on:dblclick={() => appStore.createNewTab()}
+    >
+      <!-- 撤销和重做按钮 -->
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button
+          on:click={() => appStore.undo()}
+          disabled={!canUndo}
+          class="px-2 py-1 rounded text-sm transition-colors {canUndo
+            ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+            : 'text-gray-600 cursor-not-allowed'}"
+          title="Undo (Ctrl+Z)"
+        >
+          ←
+        </button>
+        <button
+          on:click={() => appStore.redo()}
+          disabled={!canRedo}
+          class="px-2 py-1 rounded text-sm transition-colors {canRedo
+            ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+            : 'text-gray-600 cursor-not-allowed'}"
+          title="Redo (Ctrl+Y)"
+        >
+          →
+        </button>
+      </div>
+      
+      <!-- 标签页 -->
+      <div 
+        class="flex-1 flex items-center overflow-x-auto scrollbar-hide"
+        on:wheel={handleTabScroll}
+        use:dndzone={{
+          items: tabList,
+          flipDurationMs: 200,
+          type: "tab",
+        }}
+        on:consider={handleTabDndConsider}
+        on:finalize={handleTabDndFinalize}
+      >
+        {#each tabList as tab (tab.id)}
           <div
-            class="flex items-center bg-gray-900 border-r border-gray-700 px-3 py-2 cursor-pointer min-w-[160px] max-w-[240px] group {$appStore.activeTabId === tab.id ? 'bg-gray-800' : 'hover:bg-gray-850'}"
+            class="flex items-center bg-gray-900 border-r border-gray-700 px-3 py-2 cursor-pointer min-w-[160px] max-w-[240px] group flex-shrink-0 {$appStore.activeTabId === tab.id ? 'bg-gray-800' : 'hover:bg-gray-850'}"
             on:click={() => appStore.switchTab(tab.id)}
           >
             <span class="text-white text-sm truncate flex-1 mr-2">
@@ -602,40 +661,9 @@
           </div>
         {/each}
       </div>
-      <!-- 空白区域可双击新建标签 -->
-      <div
-        class="flex-1 h-full cursor-default"
-        on:dblclick={() => appStore.createNewTab()}
-      />
     </div>
     
     {#if currentFile}
-      <div
-        class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex items-end"
-      >
-        <div class="flex items-center gap-1">
-          <button
-            on:click={() => appStore.undo()}
-            disabled={!canUndo}
-            class="px-2 py-1 rounded text-sm transition-colors {canUndo
-              ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              : 'text-gray-600 cursor-not-allowed'}"
-            title="Undo (Ctrl+Z)"
-          >
-            ←
-          </button>
-          <button
-            on:click={() => appStore.redo()}
-            disabled={!canRedo}
-            class="px-2 py-1 rounded text-sm transition-colors {canRedo
-              ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              : 'text-gray-600 cursor-not-allowed'}"
-            title="Redo (Ctrl+Y)"
-          >
-            →
-          </button>
-        </div>
-      </div>
 
       <div class="flex-1 overflow-y-auto p-4">
         <div class="max-w-4xl mx-auto min-h-full">
@@ -742,14 +770,11 @@
         </div>
       </div>
     {:else}
-      <div 
-        class="flex-1 flex items-center justify-center cursor-pointer"
-        on:dblclick={() => appStore.createNewTab()}
-      >
+      <div class="flex-1 flex items-center justify-center">
         <div class="text-center">
           <p class="text-gray-400 text-lg mb-4">No file selected</p>
           <p class="text-gray-500 text-sm">
-            Double-click here or on the tab bar to create a new prompt
+            Double-click on the tab bar to create a new prompt
           </p>
           <button
             on:click={() => appStore.createNewTab()}
