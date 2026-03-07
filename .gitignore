@@ -31,3 +31,4 @@ src-tauri/Cargo.lock
 .env
 .env.local
 .env.*.local
+*.lnk
