@@ -6,6 +6,7 @@
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
   import FileBox from "./components/FileBox.svelte";
+  import PopoverDialog from "./components/PopoverDialog.svelte";
   import { save } from "@tauri-apps/plugin-dialog";
   import { basename, dirname } from "@tauri-apps/api/path";
   import { createPromptFile } from "./tauri-api";
@@ -26,6 +27,7 @@
   let tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   let showCloseConfirmDialog = false;
   let tabToClose: string | null = null;
+  let closeButtonPosition: { x: number; y: number } | null = null;
   $: {
     tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   }
@@ -50,14 +52,13 @@
     return parts[parts.length - 1] || path;
   }
 
-  function handleCloseTabClick(tabId: string) {
+  function handleCloseTabClick(tabId: string, event: MouseEvent) {
     const tab = $appStore.tabs.find((t) => t.id === tabId);
     if (tab && tab.isUnsaved && !tab.filePath) {
-      // 是未保存的临时文件，显示确认对话框
       tabToClose = tabId;
       showCloseConfirmDialog = true;
+      closeButtonPosition = { x: event.clientX, y: event.clientY };
     } else {
-      // 不是临时文件或已保存，直接关闭
       appStore.closeTab(tabId);
     }
   }
@@ -73,6 +74,7 @@
   function cancelCloseTab() {
     showCloseConfirmDialog = false;
     tabToClose = null;
+    closeButtonPosition = null;
   }
 
   // 跟踪哪个 FileBox 正在被拖放文件
@@ -691,7 +693,7 @@
             </span>
             <button
               class="text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-              on:click|stopPropagation={() => handleCloseTabClick(tab.id)}
+              on:click|stopPropagation={(e) => handleCloseTabClick(tab.id, e)}
               title="关闭"
             >
               ×
@@ -834,28 +836,13 @@
   </div>
 </div>
 
-{#if showCloseConfirmDialog}
-  <div
-    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-    on:click={cancelCloseTab}
-  >
-    <div class="bg-gray-800 rounded-lg p-6 w-96" on:click|stopPropagation>
-      <h2 class="text-white text-lg font-bold mb-4">确认关闭</h2>
-      <p class="text-gray-300 mb-4">此文件尚未保存，确定要关闭吗？</p>
-      <div class="flex justify-end gap-2">
-        <button
-          on:click={cancelCloseTab}
-          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
-        >
-          取消
-        </button>
-        <button
-          on:click={confirmCloseTab}
-          class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-        >
-          确认关闭
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<PopoverDialog
+  show={showCloseConfirmDialog}
+  position={closeButtonPosition}
+  title="确认关闭"
+  message="此文件尚未保存，确定要关闭吗？"
+  confirmText="确认关闭"
+  cancelText="取消"
+  onConfirm={confirmCloseTab}
+  onCancel={cancelCloseTab}
+/>

@@ -8,6 +8,7 @@
   } from "../tauri-api";
   import { open } from "@tauri-apps/plugin-dialog";
   import Workbench from "./Workbench.svelte";
+  import PopoverDialog from "./PopoverDialog.svelte";
   import { basename, dirname } from "@tauri-apps/api/path";
 
   let recentFiles: string[] = [];
@@ -16,11 +17,14 @@
   let showRenameDialog = false;
   let renamePath: string | null = null;
   let renameName = "";
+  let renamePosition: { x: number; y: number } | null = null;
   let showCopyDialog = false;
   let copyPath: string | null = null;
   let copyName = "";
+  let copyPosition: { x: number; y: number } | null = null;
   let showDeleteDialog = false;
   let deletePath: string | null = null;
+  let deletePosition: { x: number; y: number } | null = null;
   // Context menu state
   let contextMenuVisible = false;
   let contextMenuX = 0;
@@ -100,6 +104,7 @@
     renamePath = contextMenuFilePath;
     const fileName = getFileName(renamePath).replace(".prompt", "");
     renameName = fileName;
+    renamePosition = { x: contextMenuX, y: contextMenuY };
     showRenameDialog = true;
     hideContextMenu();
   }
@@ -108,10 +113,8 @@
     if (!renamePath || !renameName.trim()) return;
     try {
       const newFilePath = await renamePromptFile(renamePath, renameName.trim());
-      // 更新最近文件列表
       appStore.removeRecentFile(renamePath);
       appStore.addRecentFile(newFilePath);
-      // 如果重命名的是当前打开的文件，更新当前文件路径
       if ($appStore.currentFilePath === renamePath) {
         const newFileName = getFileName(newFilePath);
         appStore.setCurrentFileName(newFileName);
@@ -120,10 +123,18 @@
       showRenameDialog = false;
       renamePath = null;
       renameName = "";
+      renamePosition = null;
     } catch (error) {
       console.error("Failed to rename file:", error);
       appStore.showToast("Failed to rename file", "error");
     }
+  }
+
+  function cancelRename() {
+    showRenameDialog = false;
+    renamePath = null;
+    renameName = "";
+    renamePosition = null;
   }
 
   function handleCopyClick() {
@@ -131,6 +142,7 @@
     copyPath = contextMenuFilePath;
     const fileName = getFileName(copyPath).replace(".prompt", "");
     copyName = fileName + "_copy";
+    copyPosition = { x: contextMenuX, y: contextMenuY };
     showCopyDialog = true;
     hideContextMenu();
   }
@@ -143,10 +155,18 @@
       showCopyDialog = false;
       copyPath = null;
       copyName = "";
+      copyPosition = null;
     } catch (error) {
       console.error("Failed to copy file:", error);
       appStore.showToast("Failed to copy file", "error");
     }
+  }
+
+  function cancelCopy() {
+    showCopyDialog = false;
+    copyPath = null;
+    copyName = "";
+    copyPosition = null;
   }
 
   function handleDeleteClick() {
@@ -161,6 +181,7 @@
       return;
     }
     deletePath = contextMenuFilePath;
+    deletePosition = { x: contextMenuX, y: contextMenuY };
     showDeleteDialog = true;
     hideContextMenu();
   }
@@ -172,6 +193,7 @@
       appStore.removeRecentFile(deletePath);
       showDeleteDialog = false;
       deletePath = null;
+      deletePosition = null;
     } catch (error) {
       console.error("Failed to delete file:", error);
       appStore.showToast("Failed to delete file", "error");
@@ -181,6 +203,7 @@
   function cancelDelete() {
     showDeleteDialog = false;
     deletePath = null;
+    deletePosition = null;
   }
 
   function handleRemoveFromHistoryClick() {
@@ -366,92 +389,47 @@
 </div>
 
 {#if showRenameDialog && renamePath}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-lg p-6 w-96">
-      <h2 class="text-white text-lg font-bold mb-4">重命名文件</h2>
-      <input
-        type="text"
-        bind:value={renameName}
-        class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        placeholder="新名称"
-      />
-      <div class="flex justify-end gap-2">
-        <button
-          on:click={() => {
-            showRenameDialog = false;
-            renamePath = null;
-            renameName = "";
-          }}
-          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
-        >
-          取消
-        </button>
-        <button
-          on:click={handleRename}
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-        >
-          重命名
-        </button>
-      </div>
-    </div>
-  </div>
+  <PopoverDialog
+    show={showRenameDialog}
+    position={renamePosition}
+    title="重命名文件"
+    type="input"
+    inputValue={renameName}
+    inputPlaceholder="新名称"
+    confirmText="重命名"
+    cancelText="取消"
+    confirmButtonClass="bg-blue-600 hover:bg-blue-700"
+    onConfirm={handleRename}
+    onCancel={cancelRename}
+  />
 {/if}
 
 {#if showCopyDialog && copyPath}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-lg p-6 w-96">
-      <h2 class="text-white text-lg font-bold mb-4">复制文件</h2>
-      <input
-        type="text"
-        bind:value={copyName}
-        class="w-full bg-gray-700 text-white px-3 py-2 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        placeholder="副本名称"
-      />
-      <div class="flex justify-end gap-2">
-        <button
-          on:click={() => {
-            showCopyDialog = false;
-            copyPath = null;
-            copyName = "";
-          }}
-          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
-        >
-          取消
-        </button>
-        <button
-          on:click={handleCopy}
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-        >
-          复制
-        </button>
-      </div>
-    </div>
-  </div>
+  <PopoverDialog
+    show={showCopyDialog}
+    position={copyPosition}
+    title="复制文件"
+    type="input"
+    inputValue={copyName}
+    inputPlaceholder="副本名称"
+    confirmText="复制"
+    cancelText="取消"
+    confirmButtonClass="bg-blue-600 hover:bg-blue-700"
+    onConfirm={handleCopy}
+    onCancel={cancelCopy}
+  />
 {/if}
 
 {#if showDeleteDialog && deletePath}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-lg p-6 w-96">
-      <h2 class="text-white text-lg font-bold mb-4">确认删除</h2>
-      <p class="text-gray-300 mb-4">
-        确定要删除 <span class="text-white font-semibold"
-          >{getFileName(deletePath)}</span
-        >?
-      </p>
-      <div class="flex justify-end gap-2">
-        <button
-          on:click={cancelDelete}
-          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
-        >
-          取消
-        </button>
-        <button
-          on:click={confirmDelete}
-          class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-        >
-          删除
-        </button>
-      </div>
-    </div>
-  </div>
+  <PopoverDialog
+    show={showDeleteDialog}
+    position={deletePosition}
+    title="确认删除"
+    message={`确定要删除 ${getFileName(deletePath)} 吗？`}
+    confirmText="删除"
+    cancelText="取消"
+    confirmButtonClass="bg-red-600 hover:bg-red-700"
+    onConfirm={confirmDelete}
+    onCancel={cancelDelete}
+  />
 {/if}
