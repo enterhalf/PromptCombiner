@@ -1,5 +1,5 @@
 import { writable, get } from "svelte/store";
-import type { AppState, PromptFile, VariantData, Tab } from "./types";
+import type { AppState, PromptFile, VariantData, Tab, Plugin, PrivacyMapping } from "./types";
 import { savePromptFile, loadPromptFile } from "./tauri-api";
 import { basename } from "@tauri-apps/api/path";
 
@@ -65,6 +65,50 @@ function createEmptyPromptFile(): PromptFile {
   };
 }
 
+const PLUGINS_KEY = "prompt-combiner-plugins";
+const PRIVACY_MAPPINGS_KEY = "prompt-combiner-privacy-mappings";
+
+function getStoredPlugins(): Plugin[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(PLUGINS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // 忽略错误
+  }
+  return [{ id: "privacy-replace", name: "隐私信息替换", enabled: false }];
+}
+
+function savePlugins(plugins: Plugin[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PLUGINS_KEY, JSON.stringify(plugins));
+  } catch (error) {
+    console.error("Failed to save plugins:", error);
+  }
+}
+
+function getStoredPrivacyMappings(): PrivacyMapping[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(PRIVACY_MAPPINGS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePrivacyMappings(mappings: PrivacyMapping[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PRIVACY_MAPPINGS_KEY, JSON.stringify(mappings));
+  } catch (error) {
+    console.error("Failed to save privacy mappings:", error);
+  }
+}
+
 const defaultState: AppState = {
   tabs: [],
   activeTabId: null,
@@ -76,6 +120,11 @@ const defaultState: AppState = {
   showGeneratedModal: false,
   recentFiles: getStoredRecentFiles(),
   toasts: [],
+  plugins: getStoredPlugins(),
+  privacyMappings: getStoredPrivacyMappings(),
+  showPluginPanel: false,
+  showPrivacyManager: false,
+  showPrivacyRestore: false,
 };
 
 let autoSaveTimeout: number | null = null;
@@ -503,6 +552,49 @@ function createAppStore() {
     },
     reset: () => set(defaultState),
     saveCurrentFile,
+    togglePlugin: (pluginId: string) => {
+      update((s) => {
+        const newPlugins = s.plugins.map((p) =>
+          p.id === pluginId ? { ...p, enabled: !p.enabled } : p
+        );
+        savePlugins(newPlugins);
+        return { ...s, plugins: newPlugins };
+      });
+    },
+    setShowPluginPanel: (show: boolean) =>
+      update((s) => ({ ...s, showPluginPanel: show })),
+    setShowPrivacyManager: (show: boolean) =>
+      update((s) => ({ ...s, showPrivacyManager: show })),
+    setShowPrivacyRestore: (show: boolean) =>
+      update((s) => ({ ...s, showPrivacyRestore: show })),
+    addPrivacyMapping: (original: string, replacement: string) => {
+      update((s) => {
+        const newMapping: PrivacyMapping = {
+          id: Math.random().toString(36).substr(2, 9),
+          original,
+          replacement: replacement || "***",
+        };
+        const newMappings = [...s.privacyMappings, newMapping];
+        savePrivacyMappings(newMappings);
+        return { ...s, privacyMappings: newMappings };
+      });
+    },
+    updatePrivacyMapping: (id: string, original: string, replacement: string) => {
+      update((s) => {
+        const newMappings = s.privacyMappings.map((m) =>
+          m.id === id ? { ...m, original, replacement: replacement || "***" } : m
+        );
+        savePrivacyMappings(newMappings);
+        return { ...s, privacyMappings: newMappings };
+      });
+    },
+    removePrivacyMapping: (id: string) => {
+      update((s) => {
+        const newMappings = s.privacyMappings.filter((m) => m.id !== id);
+        savePrivacyMappings(newMappings);
+        return { ...s, privacyMappings: newMappings };
+      });
+    },
   };
 }
 

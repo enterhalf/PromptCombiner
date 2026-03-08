@@ -7,6 +7,8 @@
   import TextBox from "./components/TextBox.svelte";
   import FileBox from "./components/FileBox.svelte";
   import PopoverDialog from "./components/PopoverDialog.svelte";
+  import PrivacyManager from "./components/PrivacyManager.svelte";
+  import PrivacyRestore from "./components/PrivacyRestore.svelte";
   import { save } from "@tauri-apps/plugin-dialog";
   import { basename, dirname } from "@tauri-apps/api/path";
   import { createPromptFile } from "./tauri-api";
@@ -846,3 +848,11 @@
   onConfirm={confirmCloseTab}
   onCancel={cancelCloseTab}
 />
+
+{#if $appStore.showPrivacyManager}
+  <PrivacyManager />
+{/if}
+
+{#if $appStore.showPrivacyRestore}
+  <PrivacyRestore />
+{/if}

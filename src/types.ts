@@ -70,6 +70,18 @@ export interface Tab {
   isUnsaved: boolean;
 }
 
+export interface PrivacyMapping {
+  id: string;
+  original: string;
+  replacement: string;
+}
+
+export interface Plugin {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
+
 export interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
@@ -81,6 +93,11 @@ export interface AppState {
   showGeneratedModal: boolean;
   recentFiles: string[];
   toasts: Toast[];
+  plugins: Plugin[];
+  privacyMappings: PrivacyMapping[];
+  showPluginPanel: boolean;
+  showPrivacyManager: boolean;
+  showPrivacyRestore: boolean;
 }
 
 // 框体类型，为未来扩展预留

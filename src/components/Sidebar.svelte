@@ -252,9 +252,35 @@
 <div
   class="w-64 bg-gray-900 border-r border-gray-700 flex flex-col h-full sidebar-container"
 >
-  <div class="p-4 border-b border-gray-700">
-    <h1 class="text-white text-lg font-bold">Prompt Combiner</h1>
+  <div class="px-4 py-2 border-b border-gray-700 flex items-center">
+    <button
+      on:click={() => appStore.setShowPluginPanel(!$appStore.showPluginPanel)}
+      class="p-2 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+      title="插件"
+    >
+      ⚡
+    </button>
   </div>
+
+  <!-- 插件面板 -->
+  {#if $appStore.showPluginPanel}
+    <div class="bg-gray-800 border-b border-gray-700 p-3">
+      <h3 class="text-white text-sm font-bold mb-2">插件</h3>
+      <div class="space-y-2">
+        {#each $appStore.plugins as plugin}
+          <label class="flex items-center gap-2 text-gray-300 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={plugin.enabled}
+              on:change={() => appStore.togglePlugin(plugin.id)}
+              class="accent-blue-500"
+            />
+            <span>{plugin.name}</span>
+          </label>
+        {/each}
+      </div>
+    </div>
+  {/if}
 
   <!-- Workbench 区域 -->
   <div

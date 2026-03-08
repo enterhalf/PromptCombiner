@@ -1,8 +1,12 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
   import { appStore } from "../store";
-  import type { PromptFile, FileBoxItem } from "../types";
+  import type { PromptFile, FileBoxItem, Plugin } from "../types";
   import { readFileContent } from "../tauri-api";
+
+  $: privacyPluginEnabled =
+    $appStore.plugins.find((p: Plugin) => p.id === "privacy-replace")
+      ?.enabled ?? false;
 
   export let currentFile: PromptFile;
 
@@ -10,7 +14,7 @@
   $: outlineItems = currentFile.order.map((boxId, index) => {
     const textBox = currentFile.text_boxes[boxId];
     const fileBox = currentFile.file_boxes?.[boxId];
-    
+
     if (textBox) {
       const variantData = currentFile.variants[boxId];
       const currentVariantIndex = variantData?.current_variant_index || 0;
@@ -27,7 +31,8 @@
     } else if (fileBox) {
       const fileBoxData = currentFile.file_box_data?.[boxId];
       const fileCount = fileBoxData?.files?.length || 0;
-      const checkedCount = fileBoxData?.files?.filter((f: FileBoxItem) => f.checked).length || 0;
+      const checkedCount =
+        fileBoxData?.files?.filter((f: FileBoxItem) => f.checked).length || 0;
       return {
         id: boxId,
         title: `File Box (${checkedCount}/${fileCount} files)`,
@@ -45,7 +50,8 @@
     if (!currentFile) return;
 
     const generated = await generatePreview();
-    appStore.setGeneratedText(generated);
+    const processed = applyPrivacyReplacements(generated);
+    appStore.setGeneratedText(processed);
     appStore.setShowGeneratedModal(true);
   }
 
@@ -93,64 +99,87 @@
   function getDisplayPath(fullPath: string, pathSegments: number): string {
     if (!fullPath) return "";
     if (pathSegments < 1) return fullPath;
-    
-    const normalizedPath = fullPath.replace(/\\/g, '/');
-    const parts = normalizedPath.split('/').filter(p => p.length > 0);
-    
+
+    const normalizedPath = fullPath.replace(/\\/g, "/");
+    const parts = normalizedPath.split("/").filter((p) => p.length > 0);
+
     if (parts.length <= pathSegments) return "";
-    
+
     const displayParts = parts.slice(pathSegments);
-    return displayParts.join('/');
+    return displayParts.join("/");
   }
 
   // 获取文件扩展名用于代码块语言标识
   function getFileExtension(filePath: string): string {
     if (!filePath) return "";
-    const parts = filePath.split('.');
+    const parts = filePath.split(".");
     if (parts.length > 1) {
       return parts[parts.length - 1].toLowerCase();
     }
     return "";
   }
 
-  async function generateFileBoxContent(fileBoxId: string, isForShadow: boolean = false): Promise<string> {
+  function applyPrivacyReplacements(text: string): string {
+    if (!privacyPluginEnabled) return text;
+
+    let result = text;
+    for (const mapping of $appStore.privacyMappings) {
+      if (mapping.original) {
+        result = result
+          .split(mapping.original)
+          .join(mapping.replacement || "***");
+      }
+    }
+    return result;
+  }
+
+  async function generateFileBoxContent(
+    fileBoxId: string,
+    isForShadow: boolean = false
+  ): Promise<string> {
     const fileBox = currentFile.file_boxes?.[fileBoxId];
     const fileBoxData = currentFile.file_box_data?.[fileBoxId];
-    
+
     // 如果是用于 shadow 变量收集，不检查 shadow 模式；否则正常检查
-    if (!fileBox || !fileBoxData || fileBox.mode === "disabled" || (!isForShadow && fileBox.mode === "shadow")) {
+    if (
+      !fileBox ||
+      !fileBoxData ||
+      fileBox.mode === "disabled" ||
+      (!isForShadow && fileBox.mode === "shadow")
+    ) {
       return "";
     }
 
     const pathSegments = fileBoxData.path_segments || 2;
-    const checkedFiles = fileBoxData.files?.filter((f: FileBoxItem) => f.checked) || [];
-    
+    const checkedFiles =
+      fileBoxData.files?.filter((f: FileBoxItem) => f.checked) || [];
+
     if (checkedFiles.length === 0) return "";
 
     let result = "";
-    
+
     for (const file of checkedFiles) {
       if (!file.path) continue;
-      
+
       try {
         const content = await readFileContent(file.path);
         const displayPath = getDisplayPath(file.path, pathSegments);
         const ext = getFileExtension(file.path);
-        
+
         result += `### ${displayPath}\n`;
-        result += "\`\`\`" + ext + "\n";
+        result += "```" + ext + "\n";
         result += content;
-        result += "\n\`\`\`\n\n";
+        result += "\n```\n\n";
       } catch (error) {
         console.error(`Failed to read file ${file.path}:`, error);
         const displayPath = getDisplayPath(file.path, pathSegments);
         result += `### ${displayPath}\n`;
-        result += "\`\`\`\n";
+        result += "```\n";
         result += `[Error reading file: ${error}]`;
-        result += "\n\`\`\`\n\n";
+        result += "\n```\n\n";
       }
     }
-    
+
     return result.trim();
   }
 
@@ -177,25 +206,31 @@
 
     // 收集 FileBox Shadow 模式的变量（使用 await 确保异步完成）
     const fileBoxShadowPromises: Promise<void>[] = [];
-    Object.entries(currentFile.file_boxes || {}).forEach(([fileBoxId, fileBox]) => {
-      if (fileBox.mode === "shadow") {
-        const fileBoxData = currentFile.file_box_data?.[fileBoxId];
-        if (fileBoxData) {
-          const varName = fileBoxData.title?.trim().toLowerCase().replace(/\s+/g, "_") || "";
-          if (varName) {
-            // 生成 FileBox 内容作为变量值（传入 true 表示用于 shadow 变量）
-            const promise = generateFileBoxContent(fileBoxId, true).then(content => {
-              if (content) {
-                shadowVars.set(varName, content);
-              }
-            }).catch(e => {
-              console.error("Error generating file box shadow content:", e);
-            });
-            fileBoxShadowPromises.push(promise);
+    Object.entries(currentFile.file_boxes || {}).forEach(
+      ([fileBoxId, fileBox]) => {
+        if (fileBox.mode === "shadow") {
+          const fileBoxData = currentFile.file_box_data?.[fileBoxId];
+          if (fileBoxData) {
+            const varName =
+              fileBoxData.title?.trim().toLowerCase().replace(/\s+/g, "_") ||
+              "";
+            if (varName) {
+              // 生成 FileBox 内容作为变量值（传入 true 表示用于 shadow 变量）
+              const promise = generateFileBoxContent(fileBoxId, true)
+                .then((content) => {
+                  if (content) {
+                    shadowVars.set(varName, content);
+                  }
+                })
+                .catch((e) => {
+                  console.error("Error generating file box shadow content:", e);
+                });
+              fileBoxShadowPromises.push(promise);
+            }
           }
         }
       }
-    });
+    );
 
     // 等待所有 FileBox shadow 变量收集完成
     await Promise.all(fileBoxShadowPromises);
@@ -206,23 +241,27 @@
     for (const boxId of currentFile.order) {
       const textBox = currentFile.text_boxes[boxId];
       const fileBox = currentFile.file_boxes?.[boxId];
-      
+
       let content = "";
-      
+
       if (textBox && textBox.mode !== "disabled" && textBox.mode !== "shadow") {
         const variantData = currentFile.variants[boxId];
         const currentVariantIndex = variantData?.current_variant_index || 0;
         content = variantData?.variants?.[currentVariantIndex]?.content || "";
-        
+
         // 替换 Shadow 变量
         shadowVars.forEach((value, key) => {
           const placeholder = `{{${key}}}`;
           content = content.replace(new RegExp(placeholder, "g"), value);
         });
-      } else if (fileBox && fileBox.mode !== "disabled" && fileBox.mode !== "shadow") {
+      } else if (
+        fileBox &&
+        fileBox.mode !== "disabled" &&
+        fileBox.mode !== "shadow"
+      ) {
         content = await generateFileBoxContent(boxId);
       }
-      
+
       if (!content) continue;
 
       if (!isFirstContent) {
@@ -237,7 +276,7 @@
 </script>
 
 <div class="flex-1 flex flex-col h-full bg-gray-900 p-4">
-  <div class="flex gap-2 mb-4">
+  <div class="grid grid-cols-2 gap-2 mb-4">
     <button
       on:click={handleGenerate}
       class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
@@ -250,6 +289,20 @@
     >
       Generate & Copy
     </button>
+    {#if privacyPluginEnabled}
+      <button
+        on:click={() => appStore.setShowPrivacyManager(true)}
+        class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded"
+      >
+        🔒 隐私管理
+      </button>
+      <button
+        on:click={() => appStore.setShowPrivacyRestore(true)}
+        class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded"
+      >
+        🔓 还原隐私
+      </button>
+    {/if}
   </div>
 
   <h3 class="text-white font-bold mb-2">Outline</h3>
