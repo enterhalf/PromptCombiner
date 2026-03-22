@@ -10,6 +10,7 @@
   import Workbench from "./Workbench.svelte";
   import PopoverDialog from "./PopoverDialog.svelte";
   import { basename, dirname } from "@tauri-apps/api/path";
+  import { exportPromptToClipboard, importPromptFromClipboard } from "../clipboard-utils";
 
   let recentFiles: string[] = [];
   let showNewFileDialog = false;
@@ -212,6 +213,52 @@
     hideContextMenu();
   }
 
+  // 剪贴板导出功能
+  async function handleExportToClipboard() {
+    const currentFile = $appStore.currentFile;
+    const state = $appStore;
+    
+    if (!currentFile) {
+      appStore.showToast("没有可导出的内容", "error");
+      return;
+    }
+    
+    // 获取当前标签的显示名称或文件名
+    const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+    const title = activeTab?.displayName || activeTab?.fileName || "Untitled";
+    
+    try {
+      const exportText = exportPromptToClipboard(currentFile, title.replace(/\.prompt$/, ""));
+      await navigator.clipboard.writeText(exportText);
+      appStore.showToast("已复制到剪贴板", "success");
+    } catch (error) {
+      console.error("Failed to export to clipboard:", error);
+      appStore.showToast("导出失败", "error");
+    }
+  }
+
+  // 剪贴板导入功能
+  async function handleImportFromClipboard() {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      const result = importPromptFromClipboard(clipboardText);
+      
+      if (!result) {
+        appStore.showToast("剪贴板内容格式无效", "error");
+        return;
+      }
+      
+      const { title, promptFile } = result;
+      
+      // 创建新标签页，标题使用导入的标题
+      appStore.createNewTab(promptFile, title, "", true);
+      appStore.showToast(`已导入: ${title}`, "success");
+    } catch (error) {
+      console.error("Failed to import from clipboard:", error);
+      appStore.showToast("导入失败，请检查剪贴板权限", "error");
+    }
+  }
+
   function handleResizeStart(e: MouseEvent) {
     if (e.button !== 0) return;
     isResizing = true;
@@ -329,6 +376,23 @@
             class:cursor-not-allowed={!isTauriEnv}
           >
             📂
+          </button>
+          <button
+            on:click={handleExportToClipboard}
+            class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+            title="导出到剪贴板"
+            disabled={!$appStore.currentFile}
+            class:opacity-50={!$appStore.currentFile}
+            class:cursor-not-allowed={!$appStore.currentFile}
+          >
+            📋
+          </button>
+          <button
+            on:click={handleImportFromClipboard}
+            class="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+            title="从剪贴板导入"
+          >
+            📥
           </button>
         </div>
       </div>
