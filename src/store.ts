@@ -239,22 +239,6 @@ function createAppStore() {
 
   async function saveCurrentFile() {
     const state = get(appStore);
-    if (state.currentFile && state.workspacePath && state.currentFileName) {
-      try {
-        const filePath = `${state.workspacePath}/${state.currentFileName}`;
-        const cleanedFile = cleanVariantDataForSave(state.currentFile);
-        await savePromptFile(filePath, cleanedFile);
-        return true;
-      } catch (error) {
-        console.error("Save failed:", error);
-        return false;
-      }
-    }
-    return false;
-  }
-
-  async function saveCurrentFile() {
-    const state = get(appStore);
     if (state.currentFile && state.currentFilePath) {
       try {
         const cleanedFile = cleanVariantDataForSave(state.currentFile);
@@ -457,6 +441,17 @@ function createAppStore() {
               filePath: filePath !== undefined ? filePath : tab.filePath,
               file: s.currentFile,
             };
+          }
+          return tab;
+        });
+        return { ...s, tabs: newTabs };
+      });
+    },
+    updateTabDisplayName: (tabId: string, displayName: string) => {
+      update((s) => {
+        const newTabs = s.tabs.map(tab => {
+          if (tab.id === tabId) {
+            return { ...tab, displayName };
           }
           return tab;
         });

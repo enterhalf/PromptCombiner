@@ -3,7 +3,11 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::command;
+use tauri::{Emitter, Manager, RunEvent, WindowEvent};
+use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TextBox {
@@ -70,6 +74,21 @@ pub struct WorkspaceItem {
     pub name: String,
     pub path: String,
     pub is_file: bool,
+}
+
+// 用于存储关闭确认状态
+pub struct CloseConfirmationState {
+    pub should_confirm: AtomicBool,
+    pub close_pending: AtomicBool,
+}
+
+impl CloseConfirmationState {
+    pub fn new() -> Self {
+        Self {
+            should_confirm: AtomicBool::new(false),
+            close_pending: AtomicBool::new(false),
+        }
+    }
 }
 
 #[command]
@@ -409,11 +428,36 @@ fn read_file(file_path: String) -> Result<String, String> {
     read_file_content(&file_path)
 }
 
+// 设置是否需要关闭确认
+#[command]
+fn set_close_confirmation(should_confirm: bool, state: tauri::State<'_, Arc<CloseConfirmationState>>) {
+    state.should_confirm.store(should_confirm, Ordering::SeqCst);
+}
+
+// 确认关闭窗口
+#[command]
+fn confirm_close(window: tauri::Window, state: tauri::State<'_, Arc<CloseConfirmationState>>) {
+    // 先禁用关闭确认，避免再次触发确认流程
+    state.should_confirm.store(false, Ordering::SeqCst);
+    state.close_pending.store(false, Ordering::SeqCst);
+    let _ = window.close();
+}
+
+// 取消关闭窗口
+#[command]
+fn cancel_close(state: tauri::State<'_, Arc<CloseConfirmationState>>) {
+    state.close_pending.store(false, Ordering::SeqCst);
+}
+
 fn main() {
+    let close_state = Arc::new(CloseConfirmationState::new());
+    let close_state_for_setup = close_state.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .manage(close_state)
         .invoke_handler(tauri::generate_handler![
             get_workspace_items,
             create_prompt_file,
@@ -423,8 +467,32 @@ fn main() {
             delete_prompt_file,
             copy_prompt_file,
             generate_context,
-            read_file
+            read_file,
+            set_close_confirmation,
+            confirm_close,
+            cancel_close
         ])
+        .on_window_event(move |window, event| {
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let state = window.state::<Arc<CloseConfirmationState>>();
+                    
+                    // 如果需要确认且没有待处理的关闭请求
+                    if state.should_confirm.load(Ordering::SeqCst) && !state.close_pending.load(Ordering::SeqCst) {
+                        // 阻止默认关闭行为
+                        api.prevent_close();
+                        
+                        // 标记关闭待处理
+                        state.close_pending.store(true, Ordering::SeqCst);
+                        
+                        // 发送事件到前端显示确认对话框
+                        let _ = window.emit("request-close-confirmation", ());
+                    }
+                    // 如果不需要确认或已经确认过，则允许关闭
+                }
+                _ => {}
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

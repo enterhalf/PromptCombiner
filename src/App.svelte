@@ -2,6 +2,7 @@
   import { dndzone } from "svelte-dnd-action";
   import { onMount, onDestroy } from "svelte";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { appStore, historyManager } from "./store";
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
@@ -11,7 +12,7 @@
   import PrivacyRestore from "./components/PrivacyRestore.svelte";
   import { save } from "@tauri-apps/plugin-dialog";
   import { basename, dirname } from "@tauri-apps/api/path";
-  import { createPromptFile } from "./tauri-api";
+  import { createPromptFile, setCloseConfirmation, confirmClose, cancelClose } from "./tauri-api";
   import type {
     TextBox as TextBoxType,
     FileBox as FileBoxType,
@@ -25,13 +26,25 @@
   $: currentFile = $appStore.currentFile;
   $: canUndo = $historyManager.past.length > 0;
   $: canRedo = $historyManager.future.length > 0;
+  // 检查是否有未保存的标签页
+  $: hasUnsavedTabs = $appStore.tabs.some(tab => tab.isUnsaved);
 
   let tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   let showCloseConfirmDialog = false;
   let tabToClose: string | null = null;
   let closeButtonPosition: { x: number; y: number } | null = null;
+  
+  // 程序关闭确认对话框
+  let showAppCloseConfirmDialog = false;
+  let unlistenCloseConfirmation: UnlistenFn | null = null;
+  
   $: {
     tabList = $appStore.tabs.map((tab) => ({ ...tab }));
+  }
+  
+  // 当未保存状态改变时，更新关闭确认设置
+  $: {
+    setCloseConfirmation(hasUnsavedTabs);
   }
 
   function handleTabDndConsider(e: CustomEvent) {
@@ -77,6 +90,46 @@
     showCloseConfirmDialog = false;
     tabToClose = null;
     closeButtonPosition = null;
+  }
+
+  // Tab 双击重命名相关
+  let editingTabId: string | null = null;
+  let editingTabName: string = "";
+  let tabNameInput: HTMLInputElement | null = null;
+
+  function handleTabDoubleClick(tab: Tab, event: MouseEvent) {
+    // 只对未保存且没有文件路径的标签页启用临时命名
+    if (tab.isUnsaved && !tab.filePath) {
+      event.stopPropagation();
+      editingTabId = tab.id;
+      editingTabName = tab.displayName || tab.fileName;
+      // 使用 setTimeout 确保 DOM 更新后再聚焦
+      setTimeout(() => {
+        tabNameInput?.focus();
+        tabNameInput?.select();
+      }, 0);
+    }
+  }
+
+  function handleTabNameSubmit() {
+    if (editingTabId && editingTabName.trim()) {
+      appStore.updateTabDisplayName(editingTabId, editingTabName.trim());
+    }
+    editingTabId = null;
+    editingTabName = "";
+  }
+
+  function handleTabNameKeyDown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      handleTabNameSubmit();
+    } else if (e.key === "Escape") {
+      editingTabId = null;
+      editingTabName = "";
+    }
+  }
+
+  function handleTabNameBlur() {
+    handleTabNameSubmit();
   }
 
   // 跟踪哪个 FileBox 正在被拖放文件
@@ -359,9 +412,16 @@
     try {
       if (!$appStore.currentFilePath) {
         // 临时文件，需要选择保存路径
+        // 获取当前标签页的 displayName（如果有的话）
+        const activeTab = $appStore.tabs.find(t => t.id === $appStore.activeTabId);
+        const displayName = activeTab?.displayName;
+        const defaultFileName = displayName
+          ? `${displayName}.prompt`
+          : "untitled.prompt";
+
         const selectedPath = await save({
           title: "保存 Prompt 文件",
-          defaultPath: "untitled.prompt",
+          defaultPath: defaultFileName,
           filters: [{ name: "Prompt Files", extensions: ["prompt"] }],
         });
 
@@ -370,10 +430,12 @@
         }
 
         const dirPath = await dirname(selectedPath);
+        // 优先使用 displayName，其次是 currentFileName（如果不是 Untitled），最后是选择的文件名
         const fileNameWithExt =
-          $appStore.currentFileName !== "Untitled"
+          displayName ||
+          ($appStore.currentFileName !== "Untitled"
             ? $appStore.currentFileName
-            : getFileName(selectedPath);
+            : getFileName(selectedPath));
         const fileName = fileNameWithExt.replace(/\.prompt$/, "");
 
         // 创建文件并保存
@@ -497,8 +559,28 @@
   }
 
   // 设置 Tauri 拖放事件监听
+  // 处理程序关闭确认
+  function handleAppCloseConfirm() {
+    showAppCloseConfirmDialog = true;
+  }
+  
+  function confirmAppClose() {
+    showAppCloseConfirmDialog = false;
+    confirmClose();
+  }
+  
+  function cancelAppClose() {
+    showAppCloseConfirmDialog = false;
+    cancelClose();
+  }
+
   onMount(async () => {
     try {
+      // 监听关闭确认请求事件
+      unlistenCloseConfirmation = await listen('request-close-confirmation', () => {
+        handleAppCloseConfirm();
+      });
+      
       const webview = getCurrentWebviewWindow();
       unlistenDragDrop = await webview.onDragDropEvent((event) => {
         const payload = event.payload as {
@@ -609,6 +691,9 @@
     if (unlistenDragDrop) {
       unlistenDragDrop();
     }
+    if (unlistenCloseConfirmation) {
+      unlistenCloseConfirmation();
+    }
   });
 </script>
 
@@ -686,13 +771,25 @@
               ? 'bg-gray-800'
               : 'hover:bg-gray-850'}"
             on:click={() => appStore.switchTab(tab.id)}
+            on:dblclick={(e) => handleTabDoubleClick(tab, e)}
           >
-            <span class="text-white text-sm truncate flex-1 mr-2">
-              {tab.fileName}
-              {#if tab.isUnsaved}
-                <span class="text-yellow-400 ml-1">•</span>
-              {/if}
-            </span>
+            {#if editingTabId === tab.id}
+              <input
+                bind:this={tabNameInput}
+                type="text"
+                bind:value={editingTabName}
+                on:keydown={handleTabNameKeyDown}
+                on:blur={handleTabNameBlur}
+                class="bg-gray-700 text-white text-sm px-2 py-0.5 rounded flex-1 mr-2 outline-none border border-blue-500"
+              />
+            {:else}
+              <span class="text-white text-sm truncate flex-1 mr-2" title={tab.isUnsaved && !tab.filePath ? "双击重命名" : ""}>
+                {tab.displayName || tab.fileName}
+                {#if tab.isUnsaved}
+                  <span class="text-yellow-400 ml-1">•</span>
+                {/if}
+              </span>
+            {/if}
             <button
               class="text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
               on:click|stopPropagation={(e) => handleCloseTabClick(tab.id, e)}
@@ -848,6 +945,38 @@
   onConfirm={confirmCloseTab}
   onCancel={cancelCloseTab}
 />
+
+<!-- 程序关闭确认对话框 -->
+{#if showAppCloseConfirmDialog}
+  <div
+    class="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center"
+    on:click={cancelAppClose}
+  >
+    <div
+      class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 p-6 w-96 animate-in fade-in zoom-in-95 duration-200"
+      on:click|stopPropagation
+    >
+      <h2 class="text-white text-lg font-bold mb-3">确认退出程序</h2>
+      <p class="text-gray-300 text-sm mb-4">
+        您有未保存的文件，确定要退出程序吗？未保存的内容将会丢失。
+      </p>
+      <div class="flex justify-end gap-3">
+        <button
+          on:click={cancelAppClose}
+          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+        >
+          取消
+        </button>
+        <button
+          on:click={confirmAppClose}
+          class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+        >
+          确认退出
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if $appStore.showPrivacyManager}
   <PrivacyManager />

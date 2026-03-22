@@ -68,6 +68,7 @@ export interface Tab {
   fileName: string;
   filePath: string;
   isUnsaved: boolean;
+  displayName?: string;
 }
 
 export interface PrivacyMapping {

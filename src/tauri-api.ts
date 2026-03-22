@@ -89,3 +89,27 @@ export async function readFileContent(filePath: string): Promise<string> {
     throw error;
   }
 }
+
+export async function setCloseConfirmation(shouldConfirm: boolean): Promise<void> {
+  try {
+    await invoke('set_close_confirmation', { shouldConfirm });
+  } catch (error) {
+    console.error('Failed to set close confirmation:', error);
+  }
+}
+
+export async function confirmClose(): Promise<void> {
+  try {
+    await invoke('confirm_close');
+  } catch (error) {
+    console.error('Failed to confirm close:', error);
+  }
+}
+
+export async function cancelClose(): Promise<void> {
+  try {
+    await invoke('cancel_close');
+  } catch (error) {
+    console.error('Failed to cancel close:', error);
+  }
+}
