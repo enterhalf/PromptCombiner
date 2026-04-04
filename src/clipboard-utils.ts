@@ -1,4 +1,29 @@
-import type { PromptFile } from "./types";
+import type { PromptFile, VariantData } from "./types";
+
+/**
+ * 清理变体数据：如果标题以 "！" 或 "!" 开头，则将内容设为空字符串（不保存到剪贴板）
+ */
+function cleanVariantDataForClipboard(promptFile: PromptFile): PromptFile {
+  const cleanedVariants: Record<string, VariantData> = {};
+
+  for (const [id, variantData] of Object.entries(promptFile.variants)) {
+    cleanedVariants[id] = {
+      ...variantData,
+      variants: variantData.variants.map((variant) => {
+        const title = variant.title || "";
+        if (title.startsWith("！") || title.startsWith("!")) {
+          return { ...variant, content: "" };
+        }
+        return variant;
+      }),
+    };
+  }
+
+  return {
+    ...promptFile,
+    variants: cleanedVariants,
+  };
+}
 
 /**
  * 剪贴板导入/导出工具
@@ -122,7 +147,8 @@ function decompressData(compressed: string): string {
  * 格式: `#标题#压缩后的JSON`
  */
 export function exportPromptToClipboard(promptFile: PromptFile, title: string): string {
-  const jsonStr = JSON.stringify(promptFile);
+  const cleanedFile = cleanVariantDataForClipboard(promptFile);
+  const jsonStr = JSON.stringify(cleanedFile);
   const compressed = compressData(jsonStr);
   return `#${title}#${compressed}`;
 }
