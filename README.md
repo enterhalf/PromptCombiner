@@ -23,6 +23,11 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
 - **自动保存**：编辑内容自动保存到本地
 - **撤销/重做**：支持 Ctrl+Z 撤销、Ctrl+Y 重做
 - **工作区管理**：选择工作目录，管理 `.prompt` 文件
+- **标签页管理**：支持多文件同时编辑，通过标签页快速切换
+- **插件系统**：支持插件扩展功能
+  - **隐私信息替换**：自动替换敏感信息，保护隐私
+  - **剪贴板导入/导出**：通过剪贴板快速分享和导入配置
+- **隐私信息管理**：管理敏感信息映射，支持一键还原
 
 ### 📥 下载安装
 
@@ -58,6 +63,20 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
   - 设置"Path segments"控制显示的路径层级（0 显示完整路径）
   - 勾选/取消勾选文件控制是否包含在输出中
   - 文件内容会自动读取并以代码块形式包含在生成的提示词中
+- **标签页管理**：
+  - 支持同时打开多个 `.prompt` 文件
+  - 点击标签页切换不同文件
+  - 点击标签页关闭按钮关闭文件
+  - 拖拽标签页调整顺序
+- **隐私信息保护**：
+  - 打开插件面板，启用"隐私信息替换"
+  - 添加需要替换的敏感信息和替换内容
+  - 生成提示词时会自动替换敏感信息
+  - 使用"还原隐私信息"功能从剪贴板还原被替换的内容
+- **剪贴板导入/导出**：
+  - 点击"导出到剪贴板"将当前配置复制到剪贴板
+  - 在其他设备或会话中，点击"从剪贴板导入"恢复配置
+  - 导出格式为 `#标题#压缩后的JSON`，便于分享
 
 ### ⌨️ 快捷键
 
@@ -89,6 +108,11 @@ Prompt Combiner is a cross-platform prompt management and combination tool that 
 - **Auto Save**: Automatically save edits to local storage
 - **Undo/Redo**: Support Ctrl+Z for undo and Ctrl+Y for redo
 - **Workspace Management**: Select workspace directory and manage `.prompt` files
+- **Tab Management**: Support multi-file editing with quick tab switching
+- **Plugin System**: Extend functionality with plugins
+  - **Privacy Information Replacement**: Automatically replace sensitive information to protect privacy
+  - **Clipboard Import/Export**: Quickly share and import configurations via clipboard
+- **Privacy Management**: Manage sensitive information mappings with one-click restore
 
 ### 📥 Download & Install
 
@@ -124,6 +148,20 @@ We provide pre-built installation packages for Windows, macOS, and Linux.
   - Set "Path segments" to control displayed path levels (0 = full path)
   - Check/uncheck files to control inclusion in output
   - File contents are automatically read and included as code blocks in generated prompts
+- **Tab Management**:
+  - Support opening multiple `.prompt` files simultaneously
+  - Click tabs to switch between different files
+  - Click the close button on tabs to close files
+  - Drag tabs to reorder them
+- **Privacy Protection**:
+  - Open the plugin panel and enable "Privacy Information Replacement"
+  - Add sensitive information and replacement content
+  - Sensitive information will be automatically replaced when generating prompts
+  - Use "Restore Privacy Information" to restore replaced content from clipboard
+- **Clipboard Import/Export**:
+  - Click "Export to Clipboard" to copy current configuration to clipboard
+  - In other devices or sessions, click "Import from Clipboard" to restore configuration
+  - Export format is `#title#compressed_json`, easy to share
 
 ### ⌨️ Keyboard Shortcuts
 
@@ -137,15 +175,16 @@ We provide pre-built installation packages for Windows, macOS, and Linux.
 ### 技术栈 | Tech Stack
 
 - **前端 Frontend**: Svelte 4 + TypeScript
-- **后端 Backend**: Rust (Tauri)
+- **后端 Backend**: Rust (Tauri 2.0)
 - **样式 Styling**: Tailwind CSS
 - **构建工具 Build Tool**: Vite
+- **拖拽功能 Drag & Drop**: svelte-dnd-action
 
 ### 环境要求 | Prerequisites
 
 - Node.js 18+ and npm
 - Rust and Cargo
-- Tauri CLI
+- Tauri CLI 2.0+
 
 ### 安装依赖 | Install Dependencies
 
@@ -177,32 +216,60 @@ npm run tauri dev
 npm run tauri build
 ```
 
+### 远程编译 | Remote Build
+
+使用 GitHub Actions 进行自动化构建：
+
+1. 创建并推送标签（v 开头的版本号，例如：v1.0.0）：
+
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+2. GitHub Actions 会自动触发构建流程，生成各平台的安装包
+
+3. 构建完成后，在项目的 [Releases 页面](../../releases) 下载对应的安装包
+
 ### 项目结构 | Project Structure
 
 ```
 prompt-combiner/
 ├── src/
 │   ├── components/
-│   │   ├── TextBox.svelte      # 文本框组件 | Text box component with modes and variants
-│   │   ├── FileBox.svelte      # 文件框组件 | File box component for managing files
-│   │   ├── Separator.svelte     # 分隔符组件 | Separator component
-│   │   ├── Sidebar.svelte       # 文件浏览器和导航 | File browser and navigation
-│   │   └── Workbench.svelte     # 生成和大纲视图 | Generation and outline view
-│   ├── App.svelte               # 主应用组件 | Main application component
-│   ├── main.ts                  # 应用入口 | Application entry point
-│   ├── app.css                  # 全局样式 | Global styles
-│   ├── store.ts                 # Svelte 状态管理 | Svelte store for state management
-│   ├── types.ts                 # TypeScript 类型定义 | TypeScript type definitions
-│   └── tauri-api.ts             # Tauri API 封装 | Tauri API wrapper functions
+│   │   ├── TextBox.svelte        # 文本框组件 | Text box component with modes and variants
+│   │   ├── FileBox.svelte        # 文件框组件 | File box component for managing files
+│   │   ├── Separator.svelte      # 分隔符组件 | Separator component
+│   │   ├── Sidebar.svelte        # 文件浏览器和导航 | File browser and navigation
+│   │   ├── Workbench.svelte      # 生成和大纲视图 | Generation and outline view
+│   │   ├── PopoverDialog.svelte  # 弹窗对话框组件 | Popover dialog component
+│   │   ├── PrivacyManager.svelte # 隐私信息管理组件 | Privacy information management component
+│   │   └── PrivacyRestore.svelte # 隐私信息还原组件 | Privacy information restore component
+│   ├── App.svelte                # 主应用组件 | Main application component
+│   ├── main.ts                   # 应用入口 | Application entry point
+│   ├── app.css                   # 全局样式 | Global styles
+│   ├── store.ts                  # Svelte 状态管理 | Svelte store for state management
+│   ├── types.ts                  # TypeScript 类型定义 | TypeScript type definitions
+│   ├── tauri-api.ts              # Tauri API 封装 | Tauri API wrapper functions
+│   └── clipboard-utils.ts        # 剪贴板导入/导出工具 | Clipboard import/export utilities
 ├── src-tauri/
 │   ├── src/
-│   │   └── main.rs              # Rust 后端文件 I/O | Rust backend with file I/O
-│   ├── Cargo.toml               # Rust 依赖 | Rust dependencies
-│   └── tauri.conf.json          # Tauri 配置 | Tauri configuration
+│   │   └── main.rs               # Rust 后端文件 I/O | Rust backend with file I/O
+│   ├── capabilities/             # Tauri 2.0 权限配置 | Tauri 2.0 capabilities configuration
+│   ├── gen/                      # Tauri 生成的文件 | Tauri generated files
+│   ├── Cargo.toml                # Rust 依赖 | Rust dependencies
+│   ├── tauri.conf.json           # Tauri 配置 | Tauri configuration
+│   └── icons/                    # 应用图标 | Application icons
+├── .github/
+│   └── workflows/
+│       └── release.yml           # GitHub Actions 工作流 | GitHub Actions workflow
+├── .vscode/
+│   └── extensions.json           # VS Code 扩展推荐 | VS Code extensions recommendations
 ├── package.json                 # Node.js 依赖 | Node.js dependencies
 ├── vite.config.ts               # Vite 配置 | Vite configuration
 ├── tailwind.config.js           # Tailwind CSS 配置 | Tailwind CSS configuration
-└── tsconfig.json                # TypeScript 配置 | TypeScript configuration
+├── tsconfig.json                # TypeScript 配置 | TypeScript configuration
+└── svelte.config.js             # Svelte 配置 | Svelte configuration
 ```
 
 ### 文件格式 | File Format
@@ -252,7 +319,7 @@ prompt-combiner/
       ]
     }
   },
-  "separators": {}
+  "separators": []
 }
 ```
 
