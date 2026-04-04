@@ -12,7 +12,12 @@
   import PrivacyRestore from "./components/PrivacyRestore.svelte";
   import { save } from "@tauri-apps/plugin-dialog";
   import { basename, dirname } from "@tauri-apps/api/path";
-  import { createPromptFile, setCloseConfirmation, confirmClose, cancelClose } from "./tauri-api";
+  import {
+    createPromptFile,
+    setCloseConfirmation,
+    confirmClose,
+    cancelClose,
+  } from "./tauri-api";
   import type {
     TextBox as TextBoxType,
     FileBox as FileBoxType,
@@ -27,21 +32,21 @@
   $: canUndo = $historyManager.past.length > 0;
   $: canRedo = $historyManager.future.length > 0;
   // 检查是否有未保存的标签页
-  $: hasUnsavedTabs = $appStore.tabs.some(tab => tab.isUnsaved);
+  $: hasUnsavedTabs = $appStore.tabs.some((tab) => tab.isUnsaved);
 
   let tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   let showCloseConfirmDialog = false;
   let tabToClose: string | null = null;
   let closeButtonPosition: { x: number; y: number } | null = null;
-  
+
   // 程序关闭确认对话框
   let showAppCloseConfirmDialog = false;
   let unlistenCloseConfirmation: UnlistenFn | null = null;
-  
+
   $: {
     tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   }
-  
+
   // 当未保存状态改变时，更新关闭确认设置
   $: {
     setCloseConfirmation(hasUnsavedTabs);
@@ -413,7 +418,9 @@
       if (!$appStore.currentFilePath) {
         // 临时文件，需要选择保存路径
         // 获取当前标签页的 displayName（如果有的话）
-        const activeTab = $appStore.tabs.find(t => t.id === $appStore.activeTabId);
+        const activeTab = $appStore.tabs.find(
+          (t) => t.id === $appStore.activeTabId,
+        );
         const displayName = activeTab?.displayName;
         const defaultFileName = displayName
           ? `${displayName}.prompt`
@@ -470,7 +477,7 @@
       if (errorMessage.includes("Tauri") || errorMessage.includes("invoke")) {
         appStore.showToast(
           "This feature is only available in the Tauri desktop app",
-          "error"
+          "error",
         );
       } else {
         appStore.showToast(`Failed to save file: ${errorMessage}`, "error");
@@ -563,12 +570,12 @@
   function handleAppCloseConfirm() {
     showAppCloseConfirmDialog = true;
   }
-  
+
   function confirmAppClose() {
     showAppCloseConfirmDialog = false;
     confirmClose();
   }
-  
+
   function cancelAppClose() {
     showAppCloseConfirmDialog = false;
     cancelClose();
@@ -577,10 +584,13 @@
   onMount(async () => {
     try {
       // 监听关闭确认请求事件
-      unlistenCloseConfirmation = await listen('request-close-confirmation', () => {
-        handleAppCloseConfirm();
-      });
-      
+      unlistenCloseConfirmation = await listen(
+        "request-close-confirmation",
+        () => {
+          handleAppCloseConfirm();
+        },
+      );
+
       const webview = getCurrentWebviewWindow();
       unlistenDragDrop = await webview.onDragDropEvent((event) => {
         const payload = event.payload as {
@@ -612,7 +622,7 @@
         // 获取滚动容器的滚动偏移
         function getScrollOffset(): number {
           const scrollContainer = document.querySelector(
-            ".flex-1.overflow-y-auto"
+            ".flex-1.overflow-y-auto",
           );
           if (scrollContainer) {
             return scrollContainer.scrollTop;
@@ -766,10 +776,10 @@
       >
         {#each tabList as tab (tab.id)}
           <div
-            class="flex items-center bg-gray-900 border-r border-gray-700 px-3 py-2 cursor-pointer min-w-[160px] max-w-[240px] group flex-shrink-0 {$appStore.activeTabId ===
+            class="flex items-center bg-gray-900 border-r border-gray-700 px-3 py-2 cursor-pointer min-w-[160px] max-w-[240px] group flex-shrink-0 border-t-2 transition-colors {$appStore.activeTabId ===
             tab.id
-              ? 'bg-gray-800'
-              : 'hover:bg-gray-850'}"
+              ? 'bg-blue-600 border-t-blue-400'
+              : 'border-t-transparent hover:bg-gray-800'}"
             on:click={() => appStore.switchTab(tab.id)}
             on:dblclick={(e) => handleTabDoubleClick(tab, e)}
           >
@@ -783,7 +793,10 @@
                 class="bg-gray-700 text-white text-sm px-2 py-0.5 rounded flex-1 mr-2 outline-none border border-blue-500"
               />
             {:else}
-              <span class="text-white text-sm truncate flex-1 mr-2" title={tab.isUnsaved && !tab.filePath ? "双击重命名" : ""}>
+              <span
+                class="text-white text-sm truncate flex-1 mr-2"
+                title={tab.isUnsaved && !tab.filePath ? "双击重命名" : ""}
+              >
                 {tab.displayName || tab.fileName}
                 {#if tab.isUnsaved}
                   <span class="text-yellow-400 ml-1">•</span>
