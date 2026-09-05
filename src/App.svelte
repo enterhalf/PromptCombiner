@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from "svelte";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { get } from "svelte/store";
   import { appStore, historyManager } from "./store";
   import Sidebar from "./components/Sidebar.svelte";
   import TextBox from "./components/TextBox.svelte";
@@ -22,6 +23,7 @@
     TextBox as TextBoxType,
     FileBox as FileBoxType,
     FileBoxData,
+    VariantData,
     Variant,
     BoxType,
     FileBoxItem,
@@ -264,18 +266,70 @@
     });
   }
 
+  // ------------------------------------------------------------------
+  // 变体变更的批处理与合并
+  //
+  // 背景：跨 Text Box 拖动 Variant 时，svelte-dnd-action 会在同一次松手
+  // 的同步调用栈里先后对目标框和源框各派发一次 finalize，两个 TextBox
+  // 会各自派发一次 variantschange。如果逐条用组件里尚未刷新的
+  // $currentFile 重建文件，后一条更新会覆盖前一条的一半结果
+  // （表现为变体"消失"或重复），并且每次写入都会生成一条历史记录，
+  // 导致撤销需要两步。
+  //
+  // 方案：把同一任务内到达的所有 variantschange 收进 pending，在微任务
+  // 里基于 store 的最新状态一次性合并写入 —— 跨框拖动 = 源框删除 +
+  // 目标框插入一次成型，历史记录也只有一条（撤销一步还原）。
+  let pendingVariantUpdates: { id: string; variantData: VariantData }[] = [];
+  let variantFlushScheduled = false;
+
+  function clampVariantData(vd: VariantData): VariantData {
+    const variants = Array.isArray(vd.variants) ? vd.variants : [];
+    let index = Math.round(Number(vd.current_variant_index) || 0);
+    if (!Number.isFinite(index)) index = 0;
+    index = Math.max(0, Math.min(index, variants.length - 1));
+    return { ...vd, variants, current_variant_index: index };
+  }
+
+  function flushPendingVariantUpdates() {
+    variantFlushScheduled = false;
+    if (pendingVariantUpdates.length === 0) return;
+
+    const updates = pendingVariantUpdates;
+    pendingVariantUpdates = [];
+
+    // 用 store 的最新状态合并（组件作用域的 $currentFile 此时可能还没刷新）
+    const file = get(appStore).currentFile;
+    if (!file) return;
+
+    const variants = { ...file.variants };
+    for (const { id, variantData } of updates) {
+      variants[id] = clampVariantData(variantData);
+    }
+
+    appStore.setCurrentFile({
+      order: file.order,
+      text_boxes: file.text_boxes,
+      file_boxes: file.file_boxes,
+      file_box_data: file.file_box_data,
+      variants,
+      separators: file.separators,
+    });
+  }
+
   function handleVariantsChange(e: CustomEvent) {
     if (!currentFile) return;
 
-    const { id, variantData } = e.detail;
-    appStore.setCurrentFile({
-      order: currentFile.order,
-      text_boxes: currentFile.text_boxes,
-      file_boxes: currentFile.file_boxes,
-      file_box_data: currentFile.file_box_data,
-      variants: { ...currentFile.variants, [id]: variantData },
-      separators: currentFile.separators,
-    });
+    const { id, variantData } = e.detail as {
+      id: string;
+      variantData: VariantData;
+    };
+    if (!id || !variantData) return;
+
+    pendingVariantUpdates.push({ id, variantData });
+    if (!variantFlushScheduled) {
+      variantFlushScheduled = true;
+      queueMicrotask(flushPendingVariantUpdates);
+    }
   }
 
   function handleHeightChange(e: CustomEvent) {

@@ -10,6 +10,14 @@
 
   const dispatch = createEventDispatcher();
 
+  // dnd-zone 中变体条目的形状（isDndShadowItem 为拖动过程中的占位标记）
+  interface DndVariantItem {
+    id: number | string;
+    index: number;
+    variant: Variant;
+    isDndShadowItem?: boolean;
+  }
+
   let isDragging = false;
   let startY = 0;
   let startHeight = 0;
@@ -30,8 +38,11 @@
   $: currentTitle = currentVariant.title;
 
   // 用于 dnd-zone 的变体列表
+  // 注意：item.id 必须唯一，且不能直接使用"数组下标"——svelte-dnd-action 跨
+  // zone 拖动时会把影子条目的 id 改写为被拖条目的 id，并据此过滤其他 zone 里
+  // 同 id 的条目；若用纯下标，目标框里同下标的变体会被误删。因此加上框 id 前缀。
   $: variantItems = variantList.map((variant, idx) => ({
-    id: idx,
+    id: `${textBox.id}-v${idx}`,
     variant,
     index: idx,
   }));
@@ -231,17 +242,27 @@
   }
 
   function handleVariantDndFinalize(e: CustomEvent) {
-    variantItems = e.detail.items;
+    // 去掉拖动过程中库可能留下的影子占位条目（isDndShadowItem），只保留真实变体
+    const rawItems = (e.detail.items || []) as DndVariantItem[];
+    const finalItems = rawItems.filter((item) => !item.isDndShadowItem);
+    variantItems = finalItems.map((item) => ({
+      id: String(item.id),
+      variant: item.variant,
+      index: item.index,
+    }));
 
-    // 重新排序变体
-    const newVariants = variantItems.map((item) => item.variant);
+    // 重新排序变体（跨 Text Box 落点时，items 已包含被拖入的变体）
+    const newVariants = finalItems.map((item) => item.variant);
 
     // 找到当前选中的变体在新列表中的位置
     const currentVariantId = variantList[currentVariantIndex];
     let newCurrentIndex = newVariants.findIndex((v) => v === currentVariantId);
     if (newCurrentIndex === -1) {
-      // 如果找不到（不应该发生），保持原来的索引或设为0
-      newCurrentIndex = Math.min(currentVariantIndex, newVariants.length - 1);
+      // 找不到（当前变体被移走/移除）：列表已空则回到 0，否则保持在范围内
+      newCurrentIndex =
+        newVariants.length === 0
+          ? 0
+          : Math.min(currentVariantIndex, newVariants.length - 1);
     }
 
     dispatch("variantschange", {
