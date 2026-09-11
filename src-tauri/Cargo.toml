@@ -1,6 +1,6 @@
 [package]
 name = "prompt-combiner"
-version = "2.1.2"
+version = "2.2.0"
 description = "Cross-platform Prompt Combiner"
 authors = ["enterhalf"]
 license = "MIT"
