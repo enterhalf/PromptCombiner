@@ -81,6 +81,8 @@ export interface Plugin {
   id: string;
   name: string;
   enabled: boolean;
+  /** 可选的悬浮提示/说明文案 */
+  description?: string;
 }
 
 export interface AppState {

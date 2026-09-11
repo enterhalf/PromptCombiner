@@ -1,6 +1,7 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
   import { createEventDispatcher } from "svelte";
+  import { get } from "svelte/store";
   import { appStore } from "../store";
   import type { TextBox, VariantData, Variant } from "../types";
 
@@ -207,8 +208,13 @@
       }
     }
 
+    // 插件选项：开启"新增变体默认空白"后，不再复制当前内容
+    const blankDefault =
+      get(appStore).plugins.find((p) => p.id === "variant-blank-default")
+        ?.enabled ?? false;
+
     const newVariant: Variant = {
-      content: currentContent,
+      content: blankDefault ? "" : currentContent,
       title: newTitle,
     };
     // 在当前变体右侧插入新变体

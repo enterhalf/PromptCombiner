@@ -315,12 +315,15 @@
       <h3 class="text-white text-sm font-bold mb-2">插件</h3>
       <div class="space-y-2">
         {#each $appStore.plugins as plugin}
-          <label class="flex items-center gap-2 text-gray-300 text-sm cursor-pointer">
+          <label
+            class="flex items-start gap-2 text-gray-300 text-sm cursor-pointer"
+            title={plugin.description || plugin.name}
+          >
             <input
               type="checkbox"
               checked={plugin.enabled}
               on:change={() => appStore.togglePlugin(plugin.id)}
-              class="accent-blue-500"
+              class="accent-blue-500 mt-0.5"
             />
             <span>{plugin.name}</span>
           </label>

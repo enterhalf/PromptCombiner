@@ -68,17 +68,45 @@ function createEmptyPromptFile(): PromptFile {
 const PLUGINS_KEY = "prompt-combiner-plugins";
 const PRIVACY_MAPPINGS_KEY = "prompt-combiner-privacy-mappings";
 
+// 插件选项默认开关状态
+const DEFAULT_PLUGINS: Plugin[] = [
+  {
+    id: "privacy-replace",
+    name: "隐私信息替换",
+    enabled: false,
+    description: "生成提示词时自动替换敏感信息",
+  },
+  {
+    // 开启后：新增变体不复制当前内容，而是创建空白变体（默认关闭 = 复制）
+    id: "variant-blank-default",
+    name: "新增变体默认空白",
+    enabled: false,
+    description:
+      "开启后，新增变体不再复制当前变体内容，而是创建空白变体（默认关闭 = 复制内容）",
+  },
+];
+
 function getStoredPlugins(): Plugin[] {
-  if (typeof window === "undefined") return [];
+  const defaults = DEFAULT_PLUGINS.map((p) => ({ ...p }));
+  if (typeof window === "undefined") return defaults;
   try {
     const stored = localStorage.getItem(PLUGINS_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored) as Plugin[];
+      // 合并：保留老用户已保存的开关状态，同时补上后续版本新增的插件项
+      const merged = DEFAULT_PLUGINS.map((def) => {
+        const saved = parsed.find((p) => p.id === def.id);
+        return saved ? { ...def, enabled: !!saved.enabled } : { ...def };
+      });
+      const extras = parsed.filter(
+        (p) => p && !DEFAULT_PLUGINS.some((d) => d.id === p.id),
+      );
+      return [...merged, ...extras];
     }
   } catch {
     // 忽略错误
   }
-  return [{ id: "privacy-replace", name: "隐私信息替换", enabled: false }];
+  return defaults;
 }
 
 function savePlugins(plugins: Plugin[]) {
