@@ -33,8 +33,6 @@
   $: currentFile = $appStore.currentFile;
   $: canUndo = $historyManager.past.length > 0;
   $: canRedo = $historyManager.future.length > 0;
-  // 检查是否有未保存的标签页
-  $: hasUnsavedTabs = $appStore.tabs.some((tab) => tab.isUnsaved);
 
   let tabList = $appStore.tabs.map((tab) => ({ ...tab }));
   let showCloseConfirmDialog = false;
@@ -43,15 +41,12 @@
 
   // 程序关闭确认对话框
   let showAppCloseConfirmDialog = false;
+  // 关闭时列出的"无法落盘"的临时标签页（无 filePath）
+  let unsavedTempTabs: Tab[] = [];
   let unlistenCloseConfirmation: UnlistenFn | null = null;
 
   $: {
     tabList = $appStore.tabs.map((tab) => ({ ...tab }));
-  }
-
-  // 当未保存状态改变时，更新关闭确认设置
-  $: {
-    setCloseConfirmation(hasUnsavedTabs);
   }
 
   function handleTabDndConsider(e: CustomEvent) {
@@ -621,22 +616,58 @@
 
   // 设置 Tauri 拖放事件监听
   // 处理程序关闭确认
-  function handleAppCloseConfirm() {
-    showAppCloseConfirmDialog = true;
+  //
+  // 关闭流程：
+  // 1) 先把【所有】已落盘的标签页写回磁盘（修复原来只保存前台标签页、后台改动丢失的问题）
+  // 2) 保存失败 -> 报错并取消退出，避免静默丢数据
+  // 3) 存在无 filePath 的临时标签页 -> 弹窗确认（临时内容不落盘）
+  // 4) 其余情况直接退出
+  async function handleAppCloseConfirm() {
+    // 先把可能尚未落库的变体变更刷进 store，再统一保存
+    flushPendingVariantUpdates();
+
+    const { failed } = await appStore.saveAllTabs();
+
+    if (failed.length > 0) {
+      appStore.showToast(
+        `${failed.length} 个文件保存失败，已取消退出，请检查后重试`,
+        "error",
+      );
+      cancelClose();
+      return;
+    }
+
+    const unsavableTabs = get(appStore).tabs.filter(
+      (tab) => tab.isUnsaved && !tab.filePath,
+    );
+
+    if (unsavableTabs.length > 0) {
+      unsavedTempTabs = unsavableTabs;
+      showAppCloseConfirmDialog = true;
+      return;
+    }
+
+    confirmClose();
   }
 
   function confirmAppClose() {
     showAppCloseConfirmDialog = false;
+    unsavedTempTabs = [];
     confirmClose();
   }
 
   function cancelAppClose() {
     showAppCloseConfirmDialog = false;
+    unsavedTempTabs = [];
     cancelClose();
   }
 
   onMount(async () => {
     try {
+      // 始终拦截关闭请求：这样关闭前可以先把所有标签页落盘，
+      // 再决定是否需要就"未落盘的临时文件"弹窗确认。
+      await setCloseConfirmation(true);
+
       // 监听关闭确认请求事件
       unlistenCloseConfirmation = await listen(
         "request-close-confirmation",
@@ -1024,8 +1055,20 @@
       on:click|stopPropagation
     >
       <h2 class="text-white text-lg font-bold mb-3">确认退出程序</h2>
-      <p class="text-gray-300 text-sm mb-4">
-        您有未保存的文件，确定要退出程序吗？未保存的内容将会丢失。
+      <p class="text-gray-300 text-sm mb-2">
+        以下临时文件未保存到本地磁盘，退出后内容将会丢失：
+      </p>
+      <ul
+        class="text-yellow-300 text-xs mb-3 max-h-40 overflow-y-auto space-y-1"
+      >
+        {#each unsavedTempTabs as tab (tab.id)}
+          <li class="truncate" title={tab.displayName || tab.fileName}>
+            • {tab.displayName || tab.fileName}
+          </li>
+        {/each}
+      </ul>
+      <p class="text-gray-400 text-xs mb-4">
+        其余已保存到磁盘的 .prompt 文件已在退出前自动保存。
       </p>
       <div class="flex justify-end gap-3">
         <button

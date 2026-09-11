@@ -280,6 +280,42 @@ function createAppStore() {
     return false;
   }
 
+  // 保存所有"已落到磁盘"的标签页（关闭程序前调用，避免后台标签页的改动丢失）。
+  // 未落盘的临时标签页（无 filePath）没有保存目标，直接跳过。
+  async function saveAllTabs(): Promise<{ saved: string[]; failed: string[] }> {
+    const state = get(appStore);
+    const saved: string[] = [];
+    const failed: string[] = [];
+
+    for (const tab of state.tabs) {
+      if (!tab.filePath) continue;
+      // 当前激活标签页以 store 里的 currentFile 为准（撤销/重做等操作只会更新它）
+      const file =
+        tab.id === state.activeTabId ? state.currentFile : tab.file;
+      if (!file) continue;
+      try {
+        const cleanedFile = cleanVariantDataForSave(file);
+        await savePromptFile(tab.filePath, cleanedFile);
+        saved.push(tab.filePath);
+      } catch (error) {
+        console.error("Failed to save tab:", tab.filePath, error);
+        failed.push(tab.filePath);
+      }
+    }
+
+    if (saved.length > 0) {
+      const savedSet = new Set(saved);
+      update((s) => ({
+        ...s,
+        tabs: s.tabs.map((t) =>
+          t.filePath && savedSet.has(t.filePath) ? { ...t, isUnsaved: false } : t,
+        ),
+      }));
+    }
+
+    return { saved, failed };
+  }
+
   return {
     subscribe,
     addRecentFile: (filePath: string) => {
@@ -575,6 +611,7 @@ function createAppStore() {
     },
     reset: () => set(defaultState),
     saveCurrentFile,
+    saveAllTabs,
     togglePlugin: (pluginId: string) => {
       update((s) => {
         const newPlugins = s.plugins.map((p) =>
