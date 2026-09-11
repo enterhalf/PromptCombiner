@@ -291,9 +291,9 @@
     : ''}"
   style="height: {height}px;"
 >
-  <!-- 标题栏 - 三栏布局 -->
+  <!-- 标题栏 - 三栏布局（顶端对齐：变体换行时右侧按钮保持在顶部，不随高度居中浮动） -->
   <div
-    class="flex items-center px-3 py-2 {modeColor} border-b border-gray-600 gap-2"
+    class="flex items-start px-3 py-2 {modeColor} border-b border-gray-600 gap-2"
   >
     <!-- 左侧：拖动句柄和标题 -->
     <div class="flex items-center gap-2 flex-shrink-0">
