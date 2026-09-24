@@ -20,6 +20,7 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
   - **禁用模式**：不参与生成
   - **影子模式**：不参与生成，但可作为变量使用（如 `{{变量名}}`）
 - **变体支持**：为每个文本框创建多个版本，方便切换
+- **变体批量操作**：`Shift` 连续多选、`Ctrl` 点选组合，可批量删除、整组拖拽移动（支持跨文本框移动）
 - **自动保存**：编辑内容自动保存到本地
 - **撤销/重做**：支持 Ctrl+Z 撤销、Ctrl+Y 重做
 - **工作区管理**：选择工作目录，管理 `.prompt` 文件
@@ -57,6 +58,12 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
 - **调整高度**：拖拽文本框底部边缘可以调整高度
 - **使用变量**：将文本框设置为"影子模式"，在其他文本框中使用 `{{变量名}}` 引用
 - **创建变体**：点击文本框右侧的"+"按钮创建变体，方便对比不同版本
+- **变体多选与批量操作**：
+  - 点击变体即可切换；`Shift + 点击` 从上次点击处连续多选；`Ctrl/Cmd + 点击` 单独加选或取消
+  - 选中多条后文本框内会出现操作条：可批量删除、整组左移/右移一格
+  - 直接拖拽任意一个被选中的变体，整组会作为一个连续块一起移动；拖到其他文本框上方松手即可整组迁移
+  - 快捷键：`Ctrl/Cmd + A` 全选、`Delete` 批量删除、`Esc` 取消选择；点击变体区空白处也可取消选择
+  - 每个文本框至少保留一个变体，把所有变体都选中后删除会被阻止
 - **临时内容**：标题以 `!` 开头的文本框内容不会被保存
 - **文件框使用**：
   - 点击"Click or drag files here"添加文件
@@ -82,6 +89,9 @@ Prompt Combiner 是一款跨平台的提示词管理和组合工具，帮助你�
 
 - `Ctrl + Z`：撤销
 - `Ctrl + Y`：重做
+- `Ctrl + A`：在变体区全选变体（需先点击任一变体）
+- `Delete` / `Backspace`：删除选中的变体
+- `Esc`：取消变体选择
 
 ---
 
@@ -105,6 +115,7 @@ Prompt Combiner is a cross-platform prompt management and combination tool that 
   - **Disabled**: Excluded from generation
   - **Shadow**: Excluded from generation but available as variables (e.g., `{{variable_name}}`)
 - **Variants Support**: Create multiple versions for each text box for easy switching
+- **Batch Variant Operations**: `Shift`-click for contiguous multi-select, `Ctrl`-click to toggle, then batch delete or drag the whole group to move (including across text boxes)
 - **Auto Save**: Automatically save edits to local storage
 - **Undo/Redo**: Support Ctrl+Z for undo and Ctrl+Y for redo
 - **Workspace Management**: Select workspace directory and manage `.prompt` files
@@ -142,6 +153,12 @@ We provide pre-built installation packages for Windows, macOS, and Linux.
 - **Resize**: Drag the bottom edge of text boxes to adjust height
 - **Use Variables**: Set text box to "Shadow" mode and use `{{variable_name}}` in other text boxes to reference it
 - **Create Variants**: Click the "+" button on the right side of text boxes to create variants for comparing different versions
+- **Variant Multi-Select & Batch Operations**:
+  - Click a variant to switch to it; `Shift + Click` selects a contiguous range from the last click; `Ctrl/Cmd + Click` adds/removes one variant
+  - Once several variants are selected an action bar appears: batch delete, move the group one step left/right
+  - Drag any selected chip and the whole group moves together as one block; drop it onto another text box to migrate the group
+  - Shortcuts: `Ctrl/Cmd + A` select all, `Delete` batch delete, `Esc` clear selection (clicking empty space in the variant area also clears it)
+  - A text box always keeps at least one variant, so deleting every variant is blocked
 - **Temporary Content**: Text boxes with titles starting with `!` will not be saved
 - **File Box Usage**:
   - Click "Click or drag files here" to add files
@@ -167,6 +184,9 @@ We provide pre-built installation packages for Windows, macOS, and Linux.
 
 - `Ctrl + Z`: Undo
 - `Ctrl + Y`: Redo
+- `Ctrl + A`: Select all variants (focus the variant area first by clicking a variant)
+- `Delete` / `Backspace`: Delete selected variants
+- `Esc`: Clear the variant selection
 
 ---
 
