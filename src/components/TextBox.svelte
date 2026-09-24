@@ -729,7 +729,6 @@
   class="flex flex-col bg-gray-800 rounded-lg mb-2 overflow-hidden relative {isDragging
     ? 'opacity-50'
     : ''}"
-  style="height: {height}px;"
 >
   <!-- 标题栏 - 三栏布局（顶端对齐：变体换行时右侧按钮保持在顶部，不随高度居中浮动） -->
   <div
@@ -929,7 +928,9 @@
     </div>
   {/if}
 
-  <div class="flex-1 relative overflow-hidden">
+  <!-- 文本区高度由拖动条控制（min-height）：整个框是内容撑开的自适应高度，
+       所以变体区再多也只是让框变高，永远不会挤占/遮住文本区，也不会把拖动条顶出容器 -->
+  <div class="flex-1 relative overflow-hidden" style="min-height: {height}px;">
     <div
       class="absolute inset-0 flex"
       style="transform: translateX(-{currentVariantIndex *
