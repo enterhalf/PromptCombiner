@@ -779,7 +779,21 @@
     </div>
 
     <!-- 中间：变体切换按钮列表 -->
-    <div class="flex-1 min-w-0">
+    <div class="flex-1 min-w-0 relative">
+      <!-- 空变体区的落点占位。
+           背景：svelte-dnd-action 是按「zone 元素自身的矩形」做命中判定的，
+           空 zone 的内容高度为 0，于是它的矩形高度也是 0，永远命中不了 ——
+           把框里最后一个变体拖走之后，这个框就再也拖不进变体了。
+           对策：给 zone 一个 min-h-6 兜底（有变体时是 no-op，chip 本身就有 26px），
+           再用这层虚线占位把落点显式画出来，空框也有可瞄准、可投放的槽位。
+           pointer-events-none 让它不抢指针事件；层级压到 zone 之下由 zone 自己带 z-10。 -->
+      {#if totalVariants === 0}
+        <div
+          class="absolute inset-0 z-0 flex items-center justify-center rounded border border-dashed border-gray-500 text-[11px] text-gray-400 pointer-events-none select-none"
+        >
+          Drop a variant here
+        </div>
+      {/if}
       <!-- svelte-ignore a11y_no_static_element_interactions a11y-no-static-element-interactions a11y_no_noninteractive_element_interactions a11y-no-noninteractive-element-interactions -->
       <div
         use:dndzone={{
@@ -792,7 +806,7 @@
         on:finalize={handleVariantDndFinalize}
         on:keydown={handleVariantZoneKeyDown}
         on:click={handleVariantZoneClick}
-        class="flex flex-wrap gap-1 justify-center"
+        class="flex flex-wrap gap-1 justify-center min-h-6 relative z-10"
         role="list"
       >
         {#each variantItems as item (item.id)}
